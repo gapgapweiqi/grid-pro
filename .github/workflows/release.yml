@@ -38,6 +38,15 @@ jobs:
         with:
           workspaces: app/src-tauri
 
+      - name: Create .env
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          cat > .env << 'EOF'
+          VITE_API_URL=https://api.grid-doc.com
+          VITE_APP_ORIGIN=https://app.grid-doc.com
+          VITE_MARKETING_URL=https://grid-doc.com
+          EOF
+
       - name: Install frontend deps
         working-directory: ${{ env.APP_DIR }}
         run: npm ci
@@ -96,6 +105,13 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: app/src-tauri
+
+      - name: Create .env
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          echo "VITE_API_URL=https://api.grid-doc.com" > .env
+          echo "VITE_APP_ORIGIN=https://app.grid-doc.com" >> .env
+          echo "VITE_MARKETING_URL=https://grid-doc.com" >> .env
 
       - name: Install frontend deps
         working-directory: ${{ env.APP_DIR }}
