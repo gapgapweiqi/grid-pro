@@ -1,0 +1,674 @@
+<script>
+function renderProductsTable() {
+  var tbody = document.getElementById("productsTbody");
+  if (!tbody) return;
+  var products = (state.products || []).slice().sort(function(a, b) { return (a.code || "").localeCompare(b.code || ""); });
+  clearElement(tbody);
+  if (!products.length) {
+    var tr = document.createElement("tr");
+    var td = document.createElement("td");
+    td.colSpan = 6;
+    td.className = "muted";
+    td.textContent = "ยังไม่มีข้อมูลสินค้า";
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    return;
+  }
+
+  products.forEach(function(product) {
+    var tr = document.createElement("tr");
+    var tdCheck = document.createElement("td");
+    var checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.dataset.entityId = product.entityId || "";
+    tdCheck.appendChild(checkbox);
+
+    var tdCode = document.createElement("td");
+    tdCode.textContent = product.code || "";
+
+    var tdName = document.createElement("td");
+    tdName.textContent = product.name || "";
+
+    var tdPrice = document.createElement("td");
+    tdPrice.textContent = formatMoney((product.json && product.json.price) || 0);
+
+    var tdStatus = document.createElement("td");
+    tdStatus.textContent = product.status || "";
+
+    var tdActions = document.createElement("td");
+    tdActions.innerHTML = '<div style="display: flex; gap: 4px;"><button class="icon-button btn-edit-product" title="แก้ไข"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button><button class="icon-button btn-delete-product" title="ลบ"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button></div>';
+    tdActions.querySelector(".btn-edit-product").addEventListener("click", function() { editProduct(product); });
+    tdActions.querySelector(".btn-delete-product").addEventListener("click", function() { deleteProduct(product.entityId); });
+
+    tr.appendChild(tdCheck);
+    tr.appendChild(tdCode);
+    tr.appendChild(tdName);
+    tr.appendChild(tdPrice);
+    tr.appendChild(tdStatus);
+    tr.appendChild(tdActions);
+    tbody.appendChild(tr);
+  });
+}
+
+function renderCustomersTable() {
+  var tbody = document.getElementById("customersTbody");
+  if (!tbody) return;
+  var filterEl = document.getElementById("customerTypeFilter");
+  var filterVal = filterEl ? filterEl.value : "ALL";
+  var customers = (state.customers || []).slice().sort(function(a, b) { return (a.code || "").localeCompare(b.code || ""); });
+  if (filterVal !== "ALL") {
+    customers = customers.filter(function(c) {
+      var cType = (c.json && c.json.customerType) || "CUSTOMER";
+      return cType === filterVal;
+    });
+  }
+  clearElement(tbody);
+  if (!customers.length) {
+    var tr = document.createElement("tr");
+    var td = document.createElement("td");
+    td.colSpan = 7;
+    td.className = "muted";
+    td.textContent = "ยังไม่มีข้อมูล";
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    return;
+  }
+
+  customers.forEach(function(customer) {
+    var tr = document.createElement("tr");
+    var tdCheck = document.createElement("td");
+    var checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.dataset.entityId = customer.entityId || "";
+    tdCheck.appendChild(checkbox);
+
+    var tdCode = document.createElement("td");
+    tdCode.textContent = customer.code || "";
+
+    var tdName = document.createElement("td");
+    tdName.textContent = customer.name || "";
+
+    var cType = (customer.json && customer.json.customerType) || "CUSTOMER";
+    var tdType = document.createElement("td");
+    tdType.textContent = cType === "VENDOR" ? "ผู้ขาย" : "ลูกค้า";
+
+    var tdTax = document.createElement("td");
+    tdTax.textContent = customer.taxId || "";
+
+    var tdStatus = document.createElement("td");
+    tdStatus.textContent = customer.status || "";
+
+    var tdActions = document.createElement("td");
+    tdActions.innerHTML = '<div style="display: flex; gap: 4px;"><button class="icon-button btn-edit-customer" title="แก้ไข"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button><button class="icon-button btn-delete-customer" title="ลบ"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button></div>';
+    tdActions.querySelector(".btn-edit-customer").addEventListener("click", function() { editCustomer(customer); });
+    tdActions.querySelector(".btn-delete-customer").addEventListener("click", function() { deleteCustomer(customer.entityId); });
+
+    tr.appendChild(tdCheck);
+    tr.appendChild(tdCode);
+    tr.appendChild(tdName);
+    tr.appendChild(tdType);
+    tr.appendChild(tdTax);
+    tr.appendChild(tdStatus);
+    tr.appendChild(tdActions);
+    tbody.appendChild(tr);
+  });
+}
+
+function renderSalespersonsTable() {
+  var tbody = document.getElementById("salespersonsTbody");
+  if (!tbody) return;
+  var salespersons = (state.salespersons || []).slice().sort(function(a, b) { return (a.code || "").localeCompare(b.code || ""); });
+  clearElement(tbody);
+  if (!salespersons.length) {
+    var tr = document.createElement("tr");
+    var td = document.createElement("td");
+    td.colSpan = 7;
+    td.className = "muted";
+    td.textContent = "ยังไม่มีข้อมูลพนักงานขาย";
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    return;
+  }
+
+  salespersons.forEach(function(salesperson) {
+    var tr = document.createElement("tr");
+    var tdCheck = document.createElement("td");
+    var checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.dataset.entityId = salesperson.entityId || "";
+    tdCheck.appendChild(checkbox);
+
+    var tdCode = document.createElement("td");
+    tdCode.textContent = salesperson.code || "";
+
+    var tdName = document.createElement("td");
+    tdName.textContent = salesperson.name || "";
+
+    var tdPhone = document.createElement("td");
+    tdPhone.textContent = salesperson.phone || "";
+
+    var tdEmail = document.createElement("td");
+    tdEmail.textContent = salesperson.email || "";
+
+    var tdStatus = document.createElement("td");
+    tdStatus.textContent = salesperson.status || "";
+
+    var tdActions = document.createElement("td");
+    tdActions.innerHTML = '<div style="display: flex; gap: 4px;"><button class="icon-button btn-edit-salesperson" title="แก้ไข"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button><button class="icon-button btn-delete-salesperson" title="ลบ"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button></div>';
+    tdActions.querySelector(".btn-edit-salesperson").addEventListener("click", function() { editSalesperson(salesperson); });
+    tdActions.querySelector(".btn-delete-salesperson").addEventListener("click", function() { deleteSalesperson(salesperson.entityId); });
+
+    tr.appendChild(tdCheck);
+    tr.appendChild(tdCode);
+    tr.appendChild(tdName);
+    tr.appendChild(tdPhone);
+    tr.appendChild(tdEmail);
+    tr.appendChild(tdStatus);
+    tr.appendChild(tdActions);
+    tbody.appendChild(tr);
+  });
+}
+
+// renderPaymentsTable - จะสร้างใหม่
+
+function requireCompany() {
+  if (state.companies && state.companies.length > 0) return true;
+  showToast('<span>กรุณาเพิ่มบริษัทก่อน</span> <a href="#" onclick="setView(\'my-company\'); return false;" style="color: #fff; text-decoration: underline; font-weight: 600;">ไปที่หน้าบริษัทของฉัน</a>', { type: "warning", duration: 6000, html: true });
+  return false;
+}
+
+function openProductModal(product) {
+  var modal = document.getElementById("productModal");
+  var title = document.getElementById("productModalTitle");
+  var editId = document.getElementById("productEditId");
+  var code = document.getElementById("productCode");
+  var name = document.getElementById("productName");
+  var descEl = document.getElementById("productDescription");
+  var serviceDescEl = document.getElementById("productServiceDesc");
+  var price = document.getElementById("productPrice");
+  var costPrice = document.getElementById("productCostPrice");
+  var unit = document.getElementById("productUnit");
+  var vatRateEl = document.getElementById("productVatRate");
+  var status = document.getElementById("productStatus");
+
+  if (product) {
+    title.textContent = "แก้ไขสินค้า/บริการ";
+    editId.value = product.entityId || "";
+    code.value = product.code || "";
+    name.value = product.name || "";
+    if (descEl) descEl.value = (product.json && product.json.description) || "";
+    if (serviceDescEl) serviceDescEl.value = (product.json && product.json.serviceDesc) || "";
+    price.value = (product.json && product.json.price) || "";
+    if (costPrice) costPrice.value = (product.json && product.json.costPrice) || "";
+    unit.value = (product.json && product.json.unit) || "";
+    if (vatRateEl) vatRateEl.value = (product.json && product.json.vatRate !== undefined) ? product.json.vatRate : "7";
+    status.value = product.status || "ACTIVE";
+  } else {
+    title.textContent = "เพิ่มสินค้า/บริการ";
+    editId.value = "";
+    var products = state.products || [];
+    var maxNum = 0;
+    products.forEach(function(p) {
+      var match = (p.code || "").match(/^P(\d+)$/);
+      if (match) {
+        var num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    });
+    var nextCode = "P" + String(maxNum + 1).padStart(3, "0");
+    code.value = nextCode;
+    name.value = "";
+    if (descEl) descEl.value = "";
+    if (serviceDescEl) serviceDescEl.value = "";
+    price.value = "";
+    if (costPrice) costPrice.value = "";
+    unit.value = "";
+    if (vatRateEl) vatRateEl.value = "7";
+    status.value = "ACTIVE";
+  }
+  modal.style.display = "flex";
+}
+
+function saveProductFromModal() {
+  var editId = document.getElementById("productEditId").value;
+  var code = document.getElementById("productCode").value.trim();
+  var name = document.getElementById("productName").value.trim();
+  var descEl = document.getElementById("productDescription");
+  var serviceDescEl = document.getElementById("productServiceDesc");
+  var description = descEl ? descEl.value.trim() : "";
+  var serviceDesc = serviceDescEl ? serviceDescEl.value.trim() : "";
+  var price = parseFloat(document.getElementById("productPrice").value) || 0;
+  var costPriceEl = document.getElementById("productCostPrice");
+  var costPrice = costPriceEl ? (parseFloat(costPriceEl.value) || 0) : 0;
+  var unit = document.getElementById("productUnit").value.trim();
+  var status = document.getElementById("productStatus").value;
+
+  if (!name) {
+    showToast("กรุณากรอกชื่อสินค้า/บริการ", { type: "warning" });
+    return;
+  }
+
+  var vatRateEl = document.getElementById("productVatRate");
+  var vatRate = vatRateEl ? parseFloat(vatRateEl.value) || 0 : 7;
+
+  runServer("saveProduct", {
+    entityId: editId || undefined,
+    code: code,
+    name: name,
+    status: status,
+    json: { price: price, costPrice: costPrice, unit: unit, description: description, serviceDesc: serviceDesc, vatRate: vatRate }
+  })
+  .then(function() {
+    document.getElementById("productModal").style.display = "none";
+    return refreshAll();
+  })
+  .catch(function(error) { showError(error); });
+}
+
+function addProduct() { if (!requireCompany()) return; openProductModal(null); }
+function editProduct(product) { openProductModal(product); }
+
+function deleteProduct(entityId) {
+  if (!entityId) return;
+  showConfirm({ title: "ลบสินค้า", message: "ต้องการลบสินค้านี้หรือไม่?", type: "danger", confirmText: "ลบ" }).then(function(ok) {
+    if (!ok) return;
+    runServer("deleteEntities", "PRODUCT", [entityId])
+      .then(function() { showToast("ลบสินค้าเรียบร้อย", { type: "success" }); return refreshAll(); })
+      .catch(function(error) { showError(error); });
+  });
+}
+
+function _renderContactsList(contacts) {
+  var list = document.getElementById("customerContactsList");
+  if (!list) return;
+  list.innerHTML = "";
+  (contacts || []).forEach(function(c, i) {
+    var row = document.createElement("div");
+    row.style.cssText = "display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;";
+    row.innerHTML = '<input class="field-control" type="text" placeholder="ชื่อ" value="' + (c.name || "") + '" style="flex:1;min-width:100px;" data-ci="name" />' +
+      '<input class="field-control" type="text" placeholder="เบอร์โทร" value="' + (c.phone || "") + '" style="flex:1;min-width:100px;" data-ci="phone" />' +
+      '<input class="field-control" type="email" placeholder="อีเมล" value="' + (c.email || "") + '" style="flex:1;min-width:120px;" data-ci="email" />' +
+      '<button type="button" style="background:none;border:none;cursor:pointer;color:#e53e3e;font-size:16px;padding:0 4px;" data-remove-contact="' + i + '">✕</button>';
+    list.appendChild(row);
+  });
+  list.querySelectorAll("[data-remove-contact]").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      var idx = parseInt(btn.dataset.removeContact, 10);
+      var cur = _collectContacts();
+      cur.splice(idx, 1);
+      _renderContactsList(cur);
+    });
+  });
+}
+
+function _collectContacts() {
+  var list = document.getElementById("customerContactsList");
+  if (!list) return [];
+  var contacts = [];
+  list.querySelectorAll("div").forEach(function(row) {
+    var nameEl = row.querySelector('[data-ci="name"]');
+    var phoneEl = row.querySelector('[data-ci="phone"]');
+    var emailEl = row.querySelector('[data-ci="email"]');
+    if (nameEl && nameEl.value.trim()) {
+      contacts.push({ name: nameEl.value.trim(), phone: (phoneEl ? phoneEl.value.trim() : ""), email: (emailEl ? emailEl.value.trim() : "") });
+    }
+  });
+  return contacts;
+}
+
+function openCustomerModal(customer) {
+  var modal = document.getElementById("customerModal");
+  var title = document.getElementById("customerModalTitle");
+  var editId = document.getElementById("customerEditId");
+  var customerTypeEl = document.getElementById("customerType");
+  var code = document.getElementById("customerCode");
+  var codeLabel = document.getElementById("customerCodeLabel");
+  var taxId = document.getElementById("customerTaxId");
+  var name = document.getElementById("customerName");
+  var address = document.getElementById("customerAddress");
+  var phone = document.getElementById("customerPhone");
+  var email = document.getElementById("customerEmail");
+  var status = document.getElementById("customerStatus");
+  var isHeadOffice = document.getElementById("customerIsHeadOffice");
+
+  function updateCustomerTypeLabels() {
+    var isVendor = customerTypeEl && customerTypeEl.value === "VENDOR";
+    if (title) title.textContent = editId.value ? (isVendor ? "แก้ไขผู้ขาย" : "แก้ไขลูกค้า") : (isVendor ? "เพิ่มผู้ขาย" : "เพิ่มลูกค้า");
+    if (codeLabel) codeLabel.textContent = isVendor ? "รหัสผู้ขาย" : "รหัสลูกค้า";
+  }
+
+  if (customerTypeEl) {
+    customerTypeEl.onchange = function() {
+      updateCustomerTypeLabels();
+      if (!editId.value) {
+        var isVendor = customerTypeEl.value === "VENDOR";
+        var prefix = isVendor ? "VEN" : "CUS";
+        var regex = isVendor ? /^VEN(\d+)$/ : /^CUS(\d+)$/;
+        var customers = state.customers || [];
+        var maxNum = 0;
+        customers.forEach(function(c) {
+          var match = (c.code || "").match(regex);
+          if (match) { var num = parseInt(match[1], 10); if (num > maxNum) maxNum = num; }
+        });
+        code.value = prefix + String(maxNum + 1).padStart(3, "0");
+      }
+    };
+  }
+
+  if (customer) {
+    var cType = (customer.json && customer.json.customerType) || "CUSTOMER";
+    if (customerTypeEl) customerTypeEl.value = cType;
+    editId.value = customer.entityId || "";
+    code.value = customer.code || "";
+    taxId.value = customer.taxId || "";
+    name.value = customer.name || "";
+    address.value = customer.address || "";
+    phone.value = customer.phone || "";
+    email.value = customer.email || "";
+    status.value = customer.status || "ACTIVE";
+    if (isHeadOffice) isHeadOffice.checked = !!(customer.json && customer.json.isHeadOffice);
+    _renderContactsList((customer.json && customer.json.contacts) || []);
+  } else {
+    if (customerTypeEl) customerTypeEl.value = "CUSTOMER";
+    editId.value = "";
+    var customers = state.customers || [];
+    var maxNum = 0;
+    customers.forEach(function(c) {
+      var match = (c.code || "").match(/^CUS(\d+)$/);
+      if (match) {
+        var num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    });
+    var nextCode = "CUS" + String(maxNum + 1).padStart(3, "0");
+    code.value = nextCode;
+    taxId.value = "";
+    name.value = "";
+    address.value = "";
+    phone.value = "";
+    email.value = "";
+    status.value = "ACTIVE";
+    if (isHeadOffice) isHeadOffice.checked = false;
+    _renderContactsList([]);
+  }
+
+  var btnAddContact = document.getElementById("btnAddContact");
+  if (btnAddContact) {
+    btnAddContact.onclick = function() {
+      _renderContactsList(_collectContacts().concat([{ name: "", phone: "", email: "" }]));
+    };
+  }
+
+  updateCustomerTypeLabels();
+  modal.style.display = "flex";
+}
+
+function saveCustomerFromModal() {
+  var editId = document.getElementById("customerEditId").value;
+  var customerTypeEl = document.getElementById("customerType");
+  var customerType = customerTypeEl ? customerTypeEl.value : "CUSTOMER";
+  var code = document.getElementById("customerCode").value.trim();
+  var taxId = document.getElementById("customerTaxId").value.trim();
+  var name = document.getElementById("customerName").value.trim();
+  var address = document.getElementById("customerAddress").value.trim();
+  var phone = document.getElementById("customerPhone").value.trim();
+  var email = document.getElementById("customerEmail").value.trim();
+  var status = document.getElementById("customerStatus").value;
+  var isHeadOfficeEl = document.getElementById("customerIsHeadOffice");
+  var isHeadOffice = isHeadOfficeEl ? isHeadOfficeEl.checked : false;
+  var contacts = _collectContacts();
+
+  if (!name) {
+    showToast("กรุณากรอกชื่อลูกค้า/บริษัท", { type: "warning" });
+    return;
+  }
+
+  runServer("saveCustomer", {
+    entityId: editId || undefined,
+    code: code,
+    name: name,
+    taxId: taxId,
+    phone: phone,
+    email: email,
+    address: address,
+    status: status,
+    json: { customerType: customerType, isHeadOffice: isHeadOffice, contacts: contacts }
+  })
+  .then(function() {
+    document.getElementById("customerModal").style.display = "none";
+    return refreshAll();
+  })
+  .catch(function(error) { showError(error); });
+}
+
+function addCustomer() { if (!requireCompany()) return; openCustomerModal(null); }
+function editCustomer(customer) { openCustomerModal(customer); }
+
+function deleteCustomer(entityId) {
+  if (!entityId) return;
+  showConfirm({ title: "ลบลูกค้า", message: "ต้องการลบลูกค้านี้หรือไม่?", type: "danger", confirmText: "ลบ" }).then(function(ok) {
+    if (!ok) return;
+    runServer("deleteEntities", "CUSTOMER", [entityId])
+      .then(function() { showToast("ลบลูกค้าเรียบร้อย", { type: "success" }); return refreshAll(); })
+      .catch(function(error) { showError(error); });
+  });
+}
+
+function openSalespersonModal(salesperson) {
+  var modal = document.getElementById("salespersonModal");
+  var title = document.getElementById("salespersonModalTitle");
+  var editId = document.getElementById("salespersonEditId");
+  var code = document.getElementById("salespersonCode");
+  var name = document.getElementById("salespersonName");
+  var phone = document.getElementById("salespersonPhone");
+  var email = document.getElementById("salespersonEmail");
+  var status = document.getElementById("salespersonStatus");
+
+  if (salesperson) {
+    title.textContent = "แก้ไขพนักงานขาย";
+    editId.value = salesperson.entityId || "";
+    code.value = salesperson.code || "";
+    name.value = salesperson.name || "";
+    phone.value = salesperson.phone || "";
+    email.value = salesperson.email || "";
+    status.value = salesperson.status || "ACTIVE";
+  } else {
+    title.textContent = "เพิ่มพนักงานขาย";
+    editId.value = "";
+    var salespersons = state.salespersons || [];
+    var maxNum = 0;
+    salespersons.forEach(function(s) {
+      var match = (s.code || "").match(/^SP(\d+)$/);
+      if (match) {
+        var num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    });
+    var nextCode = "SP" + String(maxNum + 1).padStart(3, "0");
+    code.value = nextCode;
+    name.value = "";
+    phone.value = "";
+    email.value = "";
+    status.value = "ACTIVE";
+  }
+  modal.style.display = "flex";
+}
+
+function saveSalespersonFromModal() {
+  var editId = document.getElementById("salespersonEditId").value;
+  var code = document.getElementById("salespersonCode").value.trim();
+  var name = document.getElementById("salespersonName").value.trim();
+  var phone = document.getElementById("salespersonPhone").value.trim();
+  var email = document.getElementById("salespersonEmail").value.trim();
+  var status = document.getElementById("salespersonStatus").value;
+
+  if (!name) {
+    showToast("กรุณากรอกชื่อพนักงานขาย", { type: "warning" });
+    return;
+  }
+
+  runServer("saveSalesperson", {
+    entityId: editId || undefined,
+    code: code,
+    name: name,
+    phone: phone,
+    email: email,
+    status: status,
+    json: {}
+  })
+  .then(function() {
+    document.getElementById("salespersonModal").style.display = "none";
+    return refreshAll();
+  })
+  .catch(function(error) { showError(error); });
+}
+
+function addSalesperson() { if (!requireCompany()) return; openSalespersonModal(null); }
+function editSalesperson(salesperson) { openSalespersonModal(salesperson); }
+
+function deleteSalesperson(entityId) {
+  if (!entityId) return;
+  showConfirm({ title: "ลบพนักงานขาย", message: "ต้องการลบพนักงานขายนี้หรือไม่?", type: "danger", confirmText: "ลบ" }).then(function(ok) {
+    if (!ok) return;
+    runServer("deleteEntities", "SALESPERSON", [entityId])
+      .then(function() { showToast("ลบพนักงานขายเรียบร้อย", { type: "success" }); return refreshAll(); })
+      .catch(function(error) { showError(error); });
+  });
+}
+
+function renderAll() {
+  var fns = [
+    ["renderDashboard", renderDashboard],
+    ["renderProductsTable", renderProductsTable],
+    ["renderCustomersTable", renderCustomersTable],
+    ["renderSalespersonsTable", renderSalespersonsTable],
+    ["renderCompaniesList", renderCompaniesList],
+    ["populateDocumentDropdowns", populateDocumentDropdowns]
+  ];
+  fns.forEach(function(pair) {
+    try { pair[1](); } catch (e) { console.error("[renderAll] " + pair[0] + " error:", e); }
+  });
+}
+
+function debugDocHistoryState() {
+  console.log("=== DEBUG DOC HISTORY STATE ===");
+  console.log("state.companyId:", state.companyId);
+  console.log("state.companies:", state.companies);
+  console.log("state.documents:", state.documents);
+  console.log("bootstrap.user:", bootstrap.user);
+  
+  if (state.documents && state.documents.length > 0) {
+    state.documents.forEach(function(doc, i) {
+      console.log("Doc " + i + ":", doc.docId, doc.docNo, "companyId:", doc.companyId);
+    });
+  }
+  
+  return {
+    companyId: state.companyId,
+    companiesCount: state.companies ? state.companies.length : 0,
+    documentsCount: state.documents ? state.documents.length : 0,
+    bootstrap: bootstrap
+  };
+}
+
+function refreshAll() {
+  console.log("[refreshAll] called with state.companyId:", state.companyId);
+  console.log("[refreshAll] state.companies:", state.companies ? state.companies.length : 0);
+  
+  if (!state.sheetsId) {
+    console.log("[refreshAll] No Sheets ID configured – skipping server calls");
+    state.customers = [];
+    state.products = [];
+    state.salespersons = [];
+    state.kpi = {};
+    state.unpaidDocs = [];
+    state.salesTrend = [];
+    state.documents = [];
+    renderAll();
+    return Promise.resolve();
+  }
+
+  var companyId = state.companyId || null;
+  if (!companyId) {
+    console.log("[refreshAll] No companyId selected – will fetch data without company scope");
+  }
+  console.log("[refreshAll] Fetching data for companyId:", companyId);
+  
+  function safeFetch(name) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return runServer.apply(null, args).catch(function(err) {
+      console.error("[refreshAll] " + name + " failed:", err);
+      if (name === "masterData") {
+        showToast("โหลด Master Data ล้มเหลว: " + (err.message || err), { type: "error", duration: 8000 });
+      }
+      return null;
+    });
+  }
+
+  return Promise.all([
+    safeFetch("masterData", "getMasterData", companyId),
+    safeFetch("kpi", "getKpiDataApi", companyId),
+    safeFetch("unpaidDocs", "getUnpaidDocumentsApi", companyId),
+    safeFetch("salesTrend", "getSalesTrendApi", companyId, 6),
+    safeFetch("documents", "listDocumentsApi", companyId, null)
+  ])
+  .then(function(results) {
+    var masterData = results[0];
+    var kpiData = results[1];
+    var unpaidDocs = results[2];
+    var salesTrend = results[3];
+    var documents = results[4];
+
+    console.log("[refreshAll] masterData:", masterData ? "OK" : "FAILED", masterData);
+    if (masterData) {
+      console.log("[refreshAll] masterData.products:", masterData.products ? masterData.products.length : "missing");
+      console.log("[refreshAll] masterData.customers:", masterData.customers ? masterData.customers.length : "missing");
+      console.log("[refreshAll] masterData.salespersons:", masterData.salespersons ? masterData.salespersons.length : "missing");
+      if (masterData.products && masterData.products.length > 0) {
+        console.log("[refreshAll] first product:", JSON.stringify(masterData.products[0]));
+      }
+      if (masterData.customers && masterData.customers.length > 0) {
+        console.log("[refreshAll] first customer:", JSON.stringify(masterData.customers[0]));
+      }
+    }
+    console.log("[refreshAll] kpi:", kpiData ? JSON.stringify(kpiData) : "FAILED");
+    console.log("[refreshAll] unpaidDocs:", unpaidDocs ? unpaidDocs.length : "FAILED");
+    console.log("[refreshAll] salesTrend:", salesTrend ? salesTrend.length : "FAILED");
+    console.log("[refreshAll] documents:", documents ? documents.length : "FAILED");
+
+    function parseMasterJson(records) {
+      return (records || []).map(function(r) {
+        if (typeof r.json === "string") {
+          try { r.json = JSON.parse(r.json); } catch(e) { r.json = {}; }
+        }
+        if (!r.json) r.json = {};
+        return r;
+      });
+    }
+    state.customers = parseMasterJson(masterData && masterData.customers ? masterData.customers : []);
+    state.products = parseMasterJson(masterData && masterData.products ? masterData.products : []);
+    state.salespersons = parseMasterJson(masterData && masterData.salespersons ? masterData.salespersons : []);
+    state.kpi = kpiData || {};
+    state.unpaidDocs = unpaidDocs || [];
+    state.salesTrend = salesTrend || [];
+    state.documents = (documents || []).map(function(doc) {
+      if (typeof doc.json === "string") {
+        try { doc.json = JSON.parse(doc.json); } catch(e) { doc.json = {}; }
+      }
+      if (!doc.json) doc.json = {};
+      return doc;
+    });
+    
+    console.log("[refreshAll] state.documents set to:", state.documents.length);
+    if (state.documents.length > 0) {
+      console.log("[refreshAll] First doc:", state.documents[0].docNo, state.documents[0].docType, "json type:", typeof state.documents[0].json);
+    }
+    console.log("[refreshAll] FINAL state -> products:", state.products.length, "customers:", state.customers.length, "salespersons:", state.salespersons.length);
+    renderAll();
+  })
+  .catch(function(err) {
+    console.error("[refreshAll] CRITICAL ERROR in promise chain:", err);
+    showToast("โหลดข้อมูลล้มเหลว: " + (err.message || err), { type: "error" });
+  });
+}
+</script>

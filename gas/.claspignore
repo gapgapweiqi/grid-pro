@@ -1,0 +1,13 @@
+# Ignore standalone CSS and JS files
+app.css
+app.js
+
+# Keep only the HTML wrapped versions
+# app_css.html
+# app_js.html
+# index.html
+
+# Ignore other files
+.DS_Store
+*.log
+node_modules/

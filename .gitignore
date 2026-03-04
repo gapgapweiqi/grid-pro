@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+.npm
+
+# Build outputs
+app/src-tauri/target/
+app/build/
+app/.svelte-kit/
+marketing/build/
+marketing/.svelte-kit/
+
+# Cloudflare
+worker/.wrangler/
+.wrangler/
+.dev.vars
+
+# Environment
+.env
+.env.local
+.env.production
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Tauri signing keys (NEVER commit)
+*.key
+*.key.pub
+
+# Misc
+*.log
+*.tsbuildinfo

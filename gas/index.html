@@ -1,0 +1,1561 @@
+<!DOCTYPE html>
+<html lang="th">
+  <head>
+    <base target="_top" />
+    <meta charset="utf-8" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>Business Docs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- ======= LOCAL DEV: uncomment below, comment out Apps Script include ======= -->
+    <!-- <link rel="stylesheet" href="app.css" /> -->
+    <!-- ======= APPS SCRIPT: uncomment below, comment out local link ======= -->
+    <?!= include("app_css"); ?>
+  </head>
+  <body data-bootstrap="<?= bootstrap ?>">
+    <div class="app" id="appRoot">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <div class="logo-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg></div>
+          <div class="logo-text">
+            <div class="sidebar-brand">Grid Pro</div>
+            <div class="sidebar-subtitle">จัดการธุรกิจอย่างมืออาชีพ</div>
+          </div>
+        </div>
+        <nav class="sidebar-nav">
+          <button class="nav-item is-active" data-view="dashboard">
+            <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg></span><span class="nav-label">แดชบอร์ด</span>
+          </button>
+          <button class="nav-item" data-view="documents">
+            <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg></span><span class="nav-label">ออกเอกสาร</span>
+          </button>
+          <button class="nav-item" data-view="doc-history">
+            <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></span><span class="nav-label">ประวัติเอกสาร</span>
+          </button>
+          <button class="nav-item" data-view="payments">
+            <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg></span><span class="nav-label">ติดตามชำระเงิน</span>
+          </button>
+          <div class="nav-divider"></div>
+          <button class="nav-item" data-view="products">
+            <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></span><span class="nav-label">สินค้า/บริการ</span>
+          </button>
+          <button class="nav-item" data-view="customers">
+            <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span><span class="nav-label">ลูกค้า/ผู้ขาย</span>
+          </button>
+          <button class="nav-item" data-view="salespersons">
+            <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></span><span class="nav-label">พนักงานขาย</span>
+          </button>
+          <div class="nav-divider"></div>
+          <button class="nav-item" data-view="companies">
+            <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg></span><span class="nav-label">บริษัทของฉัน</span>
+          </button>
+          <button class="nav-item" data-view="settings">
+            <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></span><span class="nav-label">ตั้งค่า</span>
+          </button>
+        </nav>
+        <button type="button" class="sidebar-toggle" onclick="toggleSidebar()" title="ย่อ/ขยาย"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg></button>
+        <div class="sidebar-footer">
+          <div class="sidebar-footnote">Grid Pro v1.0</div>
+        </div>
+      </aside>
+
+      <div class="overlay" id="sidebarOverlay"></div>
+
+      <div class="main">
+        <header class="topbar">
+          <div class="topbar-left">
+            <div>
+              <div class="topbar-title" id="viewTitle">แดชบอร์ด</div>
+              <div class="topbar-subtitle">ภาพรวมธุรกิจแบบมืออาชีพ</div>
+            </div>
+          </div>
+          <div class="topbar-actions">
+            <button class="primary-button" data-view="documents">+ สร้างเอกสาร</button>
+          </div>
+        </header>
+
+        <main class="content" id="contentRoot">
+          <section class="view is-active" data-view="dashboard">
+            <!-- Date Range Bar -->
+            <div class="dash-range-bar">
+              <div class="dash-range-pills" id="dashRangeBtns">
+                <button type="button" class="dash-range-btn" data-range="today" onclick="setDashRange('today')">วันนี้</button>
+                <button type="button" class="dash-range-btn" data-range="7" onclick="setDashRange(7)">อาทิตย์</button>
+                <button type="button" class="dash-range-btn active" data-range="30" onclick="setDashRange(30)">1 เดือน</button>
+                <button type="button" class="dash-range-btn" data-range="90" onclick="setDashRange(90)">3 เดือน</button>
+                <button type="button" class="dash-range-btn" data-range="365" onclick="setDashRange(365)">ปี</button>
+                <button type="button" class="dash-range-btn" data-range="custom" onclick="setDashRange('custom')">กำหนดเอง</button>
+              </div>
+              <div class="dash-range-right">
+                <select class="field-control" id="dashboardDocTypeFilter" style="width: 180px;">
+                  <option value="">ทุกประเภท</option>
+                  <optgroup label="เอกสารขาย / รายรับ">
+                    <option value="QUO">ใบเสนอราคา</option>
+                    <option value="INV">ใบแจ้งหนี้</option>
+                    <option value="BILL">ใบวางบิล</option>
+                    <option value="TAX">ใบกำกับภาษี</option>
+                    <option value="RCPT">ใบเสร็จรับเงิน</option>
+                    <option value="DO">ใบส่งของ</option>
+                    <option value="CN">ใบลดหนี้</option>
+                  </optgroup>
+                  <optgroup label="เอกสารซื้อ / รายจ่าย">
+                    <option value="PO">ใบสั่งซื้อ</option>
+                    <option value="PV">ใบสำคัญจ่าย</option>
+                    <option value="PR">ใบขอซื้อ</option>
+                  </optgroup>
+                </select>
+              </div>
+            </div>
+            <div class="dash-custom-range" id="dashCustomRange" style="display: none;">
+              <input type="date" class="field-control" id="dashboardDateFrom" />
+              <span class="dash-custom-sep">ถึง</span>
+              <input type="date" class="field-control" id="dashboardDateTo" />
+              <button class="primary-button" id="btnApplyDateRange" style="padding: 8px 16px; font-size: 13px;">ดูข้อมูล</button>
+            </div>
+
+            <!-- KPI Cards -->
+            <div class="kpi-grid">
+              <div class="kpi-card kpi-primary">
+                <div class="kpi-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                </div>
+                <div class="kpi-content">
+                  <div class="kpi-label" id="kpiTotalLabel">ยอดรวมทั้งหมด</div>
+                  <div class="kpi-value" id="kpiSalesThisMonth">฿0</div>
+                  <div class="kpi-meta" id="kpiSalesPeriod">1 เดือน</div>
+                </div>
+              </div>
+              <div class="kpi-card kpi-warning">
+                <div class="kpi-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                </div>
+                <div class="kpi-content">
+                  <div class="kpi-label" id="kpiUnpaidLabel">คงค้าง</div>
+                  <div class="kpi-value" id="kpiUnpaidTotal">฿0</div>
+                  <div class="kpi-meta" id="kpiUnpaidMeta">รอชำระเงิน</div>
+                </div>
+              </div>
+              <div class="kpi-card kpi-success">
+                <div class="kpi-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                </div>
+                <div class="kpi-content">
+                  <div class="kpi-label" id="kpiPaidLabel">ชำระแล้ว</div>
+                  <div class="kpi-value" id="kpiPaidThisMonth">฿0</div>
+                  <div class="kpi-meta" id="kpiPaidMeta">1 เดือน</div>
+                </div>
+              </div>
+              <div class="kpi-card kpi-info">
+                <div class="kpi-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                </div>
+                <div class="kpi-content">
+                  <div class="kpi-label" id="kpiDocCountLabel">จำนวนเอกสาร</div>
+                  <div class="kpi-value" id="kpiDocCount">0</div>
+                  <div class="kpi-meta" id="kpiDocCountMeta">ฉบับ</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="dash-grid-2">
+              <div class="dash-card">
+                <div class="dash-card-header">
+                  <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg> ยอดรวมรายเดือน</h3>
+                </div>
+                <div class="dash-card-body"><div class="dash-chart-container"><canvas id="dashSalesTrendChart"></canvas></div></div>
+              </div>
+              <div class="dash-card">
+                <div class="dash-card-header">
+                  <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg> สัดส่วนตามประเภทเอกสาร</h3>
+                </div>
+                <div class="dash-card-body"><div class="dash-chart-container"><canvas id="dashDocTypeChart"></canvas></div></div>
+              </div>
+            </div>
+
+            <!-- Summary Panels -->
+            <div class="dash-grid-2">
+              <div class="dash-card">
+                <div class="dash-card-header">
+                  <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> <span id="trendPanelHeader">สรุปตามประเภทเอกสาร</span></h3>
+                </div>
+                <div class="dash-card-body" id="salesTrendPanel" style="max-height: 350px; overflow-y: auto;"></div>
+              </div>
+              <div class="dash-card">
+                <div class="dash-card-header">
+                  <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg> เอกสารค้างชำระ</h3>
+                </div>
+                <div class="dash-card-body" id="unpaidDocsPanel" style="max-height: 350px; overflow-y: auto;">
+                  <div class="muted" style="text-align:center;padding:20px;">กำลังโหลด...</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Top Customers & Products -->
+            <div class="dash-grid-2">
+              <div class="dash-card">
+                <div class="dash-card-header">
+                  <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> ลูกค้าชำระเงินมากที่สุด</h3>
+                </div>
+                <div class="dash-card-body" style="padding:0;">
+                  <div id="topCustomersPanel" style="max-height: 300px; overflow-y: auto;">
+                    <div class="muted" style="text-align:center;padding:20px;">กำลังโหลด...</div>
+                  </div>
+                </div>
+              </div>
+              <div class="dash-card">
+                <div class="dash-card-header">
+                  <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"></line><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg> สินค้าขายดีที่สุด</h3>
+                </div>
+                <div class="dash-card-body" style="padding:0;">
+                  <div id="topProductsPanel" style="max-height: 300px; overflow-y: auto;">
+                    <div class="muted" style="text-align:center;padding:20px;">กำลังโหลด...</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" data-view="products">
+            <div class="section-header">
+              <div class="section-actions">
+                <button class="secondary-button" id="btnExportProductsCsv">ส่งออก CSV</button>
+                <button class="secondary-button" id="btnImportProductsCsv">นำเข้า CSV</button>
+                <button class="primary-button" id="btnAddProduct">+ เพิ่มสินค้า</button>
+              </div>
+            </div>
+            <div class="table-card">
+              <table>
+                <thead>
+                  <tr>
+                    <th><input type="checkbox" id="selectAllProducts" /></th>
+                    <th>รหัส</th>
+                    <th>ชื่อรายการ</th>
+                    <th>ราคาขาย</th>
+                    <th>สถานะ</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="productsTbody">
+                  <tr>
+                    <td colspan="6" class="muted">ยังไม่มีข้อมูลสินค้า</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="view" data-view="customers">
+            <div class="section-header">
+              <div class="section-actions">
+                <button class="secondary-button" id="btnExportCustomersCsv">ส่งออก CSV</button>
+                <button class="secondary-button" id="btnImportCustomersCsv">นำเข้า CSV</button>
+                <button class="primary-button" id="btnAddCustomer">+ เพิ่มลูกค้า/ผู้ขาย</button>
+              </div>
+            </div>
+            <div style="margin-bottom: var(--space-3); display: flex; align-items: center; gap: 8px;">
+              <label class="field-label" style="margin: 0; white-space: nowrap;">กรองประเภท:</label>
+              <select class="field-control" id="customerTypeFilter" style="width: auto; min-width: 140px;">
+                <option value="ALL">ทั้งหมด</option>
+                <option value="CUSTOMER">ลูกค้า</option>
+                <option value="VENDOR">ผู้ขาย</option>
+              </select>
+            </div>
+            <div class="table-card">
+              <table>
+                <thead>
+                  <tr>
+                    <th><input type="checkbox" id="selectAllCustomers" /></th>
+                    <th>รหัส</th>
+                    <th>ชื่อ</th>
+                    <th>ประเภท</th>
+                    <th>Tax ID</th>
+                    <th>สถานะ</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="customersTbody">
+                  <tr>
+                    <td colspan="7" class="muted">ยังไม่มีข้อมูล</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="view" data-view="salespersons">
+            <div class="section-header">
+              <div class="section-actions">
+                <button class="primary-button" id="btnAddSalesperson">+ เพิ่มพนักงานขาย</button>
+              </div>
+            </div>
+            <div class="table-card">
+              <table>
+                <thead>
+                  <tr>
+                    <th><input type="checkbox" /></th>
+                    <th>รหัส</th>
+                    <th>ชื่อพนักงานขาย</th>
+                    <th>โทรศัพท์</th>
+                    <th>อีเมล</th>
+                    <th>สถานะ</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="salespersonsTbody">
+                  <tr>
+                    <td colspan="7" class="muted">ยังไม่มีข้อมูลพนักงานขาย</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="view" data-view="documents">
+            <div class="section-header">
+              <div class="section-actions doc-actions">
+                <button class="secondary-button" id="btnPreviewDoc">พรีวิว</button>
+                <button class="primary-button" id="btnSaveDoc">บันทึกเอกสาร</button>
+              </div>
+            </div>
+
+            <div class="doc-form">
+              <div class="table-card">
+                <div style="padding: var(--space-5);">
+                  <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: var(--space-4);">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span style="font-weight: 600;">ออกเอกสารในนาม</span>
+                    </div>
+                    <select class="field-control" id="companySwitcher" style="min-width: 250px; font-weight: 500;"></select>
+                  </div>
+                  <div id="docSalespersonWrapper" class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                    <div>
+                      <label class="field-label">พนักงานขาย</label>
+                      <select class="field-control" id="docSalespersonSelect">
+                        <option value="">-- เลือกพนักงานขาย --</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="table-card">
+                <div style="padding: var(--space-5);">
+                  <h3 style="margin: 0 0 var(--space-4) 0; font-size: 16px; font-weight: 600;">ข้อมูลเอกสาร</h3>
+                  <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                    <div>
+                      <label class="field-label">ประเภทเอกสาร</label>
+                      <select class="field-control" id="docTypeSelect" style="min-width: 200px;">
+                        <option value="QUO">ใบเสนอราคา (Quotation)</option>
+                        <option value="INV">ใบแจ้งหนี้ (Invoice)</option>
+                        <option value="BILL">ใบวางบิล (Billing Note)</option>
+                        <option value="TAX">ใบกำกับภาษี (Tax Invoice)</option>
+                        <option value="RCPT">ใบเสร็จรับเงิน (Receipt)</option>
+                        <option value="DO">ใบส่งของ (Delivery Order)</option>
+                        <option value="PO">ใบสั่งซื้อ (Purchase Order)</option>
+                        <option value="CN">ใบลดหนี้ (Credit Note)</option>
+                        <option value="PV">ใบสำคัญจ่าย (Payment Voucher)</option>
+                        <option value="PR">ใบขอซื้อ (Purchase Request)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="field-label">เลขที่เอกสาร</label>
+                      <input class="field-control" type="text" id="docNoInput" placeholder="อัตโนมัติ" />
+                    </div>
+                    <div>
+                      <label class="field-label">วันที่เอกสาร</label>
+                      <input class="field-control" type="date" id="docDateInput" />
+                    </div>
+                    <div id="docDueDateWrapper">
+                      <label class="field-label" for="docDueDateInput" id="docDueDateLabel">วันครบกำหนด</label>
+                      <input class="field-control" type="date" id="docDueDateInput" />
+                    </div>
+                    <div>
+                      <label class="field-label">ภาษาเอกสาร</label>
+                      <select class="field-control" id="docLangSelect" style="width: 120px;">
+                        <option value="th">ไทย</option>
+                        <option value="en">English</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div id="bundledDocSection" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 12px; margin-top: 12px; border-top: 1px solid var(--color-border);">
+                    <span style="font-size: 13px; color: var(--color-muted); font-weight: 500;">เอกสารพ่วง:</span>
+                    <div id="bundledDocBadges" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+                    <button type="button" id="btnOpenBundledPicker" style="display:inline-flex;align-items:center;gap:4px;padding:6px 14px;border-radius:8px;border:1.5px dashed var(--color-border);background:transparent;color:var(--color-primary);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='var(--color-primary)';this.style.background='var(--color-primary-soft)'" onmouseout="this.style.borderColor='var(--color-border)';this.style.background='transparent'">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      เพิ่มเอกสารพ่วง
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="table-card" id="docCustomerPanel">
+                <div style="padding: var(--space-5);">
+                  <h3 style="margin: 0 0 var(--space-4) 0; font-size: 16px; font-weight: 600;" id="docCustomerLabel">ข้อมูลลูกค้า</h3>
+                  <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                    <div>
+                      <label class="field-label" id="docCustomerSelectLabel">เลือกลูกค้า</label>
+                      <select class="field-control" id="docCustomerSelect">
+                        <option value="">-- เลือกลูกค้า --</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="field-label" id="docCustomerNameLabel">ชื่อลูกค้า</label>
+                      <input class="field-control" type="text" id="docCustomerName" placeholder="ชื่อลูกค้า" />
+                    </div>
+                    <div>
+                      <label class="field-label">เลขประจำตัวผู้เสียภาษี</label>
+                      <input class="field-control" type="text" id="docCustomerTaxId" placeholder="เลข 13 หลัก" />
+                    </div>
+                    <div style="grid-column: span 2;">
+                      <label class="field-label">ที่อยู่</label>
+                      <textarea class="field-control" id="docCustomerAddress" rows="2" placeholder="ที่อยู่สำหรับออกเอกสาร"></textarea>
+                    </div>
+                    <div>
+                      <label class="field-label">โทรศัพท์</label>
+                      <input class="field-control" type="text" id="docCustomerPhone" placeholder="เบอร์โทร" />
+                    </div>
+                    <div>
+                      <label class="field-label">อีเมล</label>
+                      <input class="field-control" type="email" id="docCustomerEmail" placeholder="อีเมล" />
+                    </div>
+                    <div id="docContactWrapper" style="display:none;">
+                      <label class="field-label">ผู้ติดต่อ</label>
+                      <select class="field-control" id="docContactSelect">
+                        <option value="">-- เลือกผู้ติดต่อ --</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="table-card">
+                <div style="padding: var(--space-5);">
+                  <div style="display: flex; align-items: center; margin-bottom: var(--space-4); gap: 12px;">
+                    <h3 style="margin: 0; font-size: 16px; font-weight: 600; white-space: nowrap;" id="itemsTitle">รายการสินค้า/บริการ</h3>
+                    <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                      <span style="font-size: 13px; color: var(--color-muted); white-space: nowrap;">ประเภท:</span>
+                      <select class="field-control" id="docItemMode" style="width: auto; min-width: 90px; padding: 5px 8px; font-size: 13px;">
+                        <option value="product">สินค้า</option>
+                        <option value="service">บริการ</option>
+                      </select>
+                    </div>
+                    <label id="docOptDetailLabel" style="display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--color-muted); cursor: pointer; white-space: nowrap; flex-shrink: 0;">
+                      <input type="checkbox" id="docOptDetail" /> แสดงรายละเอียด
+                    </label>
+                  </div>
+                  <div class="doc-items-scroll">
+                    <table id="docItemsTable">
+                      <thead>
+                        <tr>
+                          <th style="width: 40px;">#</th>
+                          <th>รายการ</th>
+                          <th style="width: 80px;">จำนวน</th>
+                          <th style="width: 100px;">หน่วย</th>
+                          <th style="width: 120px;">ราคา/หน่วย</th>
+                          <th style="width: 100px;">ส่วนลด</th>
+                          <th style="width: 120px;">รวม</th>
+                          <th style="width: 50px;"></th>
+                        </tr>
+                      </thead>
+                      <tbody id="docItemsTbody">
+                        <tr>
+                          <td colspan="8" class="muted" style="text-align: center; padding: 24px;">
+                            กดปุ่ม "+ เพิ่มรายการ" เพื่อเพิ่มสินค้า/บริการ
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style="margin-top: 16px; display: flex; gap: 12px;">
+                    <button class="secondary-button" id="btnAddDocItem">+ เพิ่มรายการ</button>
+                    <button class="secondary-button" id="btnSelectProduct">เลือกจากรายการสินค้า</button>
+                    <button class="secondary-button" id="btnSelectInvoice" style="display: none;">เลือกใบแจ้งหนี้</button>
+                  </div>
+                  <div id="itemPresetsBar" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;"></div>
+                </div>
+              </div>
+
+              <div class="table-card">
+                <div style="padding: var(--space-5);">
+                  <h3 style="margin: 0 0 var(--space-4) 0; font-size: 16px; font-weight: 600;">สรุปยอด</h3>
+                  <div class="doc-summary-grid">
+                    <div>
+                      <h4 style="margin: 0 0 12px 0; font-size: 14px;">ตัวเลือก</h4>
+                      <div class="checkbox-group">
+                        <label><input type="checkbox" id="docOptDiscount" /> ส่วนลดรวม</label>
+                        <label><input type="checkbox" id="docOptVat" checked /> ภาษีมูลค่าเพิ่ม (VAT)</label>
+                        <label><input type="checkbox" id="docOptVatInc" /> ราคารวม VAT แล้ว</label>
+                        <label><input type="checkbox" id="docOptWht" /> หัก ณ ที่จ่าย (WHT)</label>
+                        <label><input type="checkbox" id="docOptCustomFee" /> ค่าใช้จ่ายเพิ่มเติม</label>
+                      </div>
+
+                      <div id="docCustomFeeSection" style="margin-top: 16px; display: none;">
+                        <label class="field-label">ค่าใช้จ่ายเพิ่มเติม</label>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                          <input class="field-control" type="text" id="docCustomFeeName" placeholder="เช่น ค่าขนส่ง, ค่าบริการ" style="flex: 1;" />
+                          <input class="field-control" type="number" id="docCustomFeeAmount" value="0" min="0" step="0.01" style="width: 120px;" placeholder="0.00" />
+                        </div>
+                      </div>
+
+                      <div id="docDiscountSection" style="margin-top: 16px; display: none;">
+                        <label class="field-label">ส่วนลดรวม</label>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                          <input class="field-control" type="number" id="docDiscountValue" value="0" min="0" style="width: 100px;" />
+                          <select class="field-control" id="docDiscountType" style="width: 80px;">
+                            <option value="percent">%</option>
+                            <option value="amount">฿</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div id="docVatSection" style="margin-top: 16px;">
+                        <label class="field-label">อัตรา VAT (%)</label>
+                        <input class="field-control" type="number" id="docVatRate" value="7" min="0" max="100" style="width: 100px;" />
+                      </div>
+
+                      <div id="docWhtSection" style="margin-top: 16px; display: none;">
+                        <label class="field-label">อัตราหัก ณ ที่จ่าย (%)</label>
+                        <select class="field-control" id="docWhtRate" style="width: 120px;">
+                          <option value="0">ไม่หัก</option>
+                          <option value="1">1%</option>
+                          <option value="2">2%</option>
+                          <option value="3" selected>3%</option>
+                          <option value="5">5%</option>
+                          <option value="10">10%</option>
+                          <option value="15">15%</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 style="margin: 0 0 12px 0; font-size: 14px;">สรุปยอด</h4>
+                      <div style="display: flex; flex-direction: column; gap: 8px; font-size: 14px;">
+                        <div style="display: flex; justify-content: space-between;">
+                          <span>ยอดรวมก่อนลด</span>
+                          <span id="docSubtotal">฿0.00</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;" id="docDiscountRow">
+                          <span>ส่วนลดรายการ</span>
+                          <span id="docItemDiscount">-฿0.00</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; display: none;" id="docTotalDiscountRow">
+                          <span>ส่วนลดรวม</span>
+                          <span id="docTotalDiscount">-฿0.00</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                          <span>ยอดหลังหักส่วนลด</span>
+                          <span id="docAfterDiscount">฿0.00</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;" id="docVatRow">
+                          <span>VAT 7%</span>
+                          <span id="docVatAmount">฿0.00</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; display: none;" id="docWhtRow">
+                          <span>หัก ณ ที่จ่าย 3%</span>
+                          <span id="docWhtAmount">-฿0.00</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; display: none;" id="docCustomFeeRow">
+                          <span>ค่าใช้จ่ายเพิ่มเติม</span>
+                          <span id="docCustomFeeDisplay">฿0.00</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-weight: 600; font-size: 18px; border-top: 1px solid var(--color-border); padding-top: 12px; margin-top: 8px;">
+                          <span>ยอดสุทธิ</span>
+                          <span id="docGrandTotal">฿0.00</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="table-card" id="docExtrasSection">
+                <div style="padding: var(--space-5);">
+                  <h3 style="margin: 0 0 var(--space-4) 0; font-size: 16px; font-weight: 600;">เพิ่มเติม</h3>
+                  <div class="doc-extras-grid">
+
+                    <!-- Signature Column -->
+                    <div class="doc-extras-card">
+                      <label style="display: flex; align-items: center; gap: 8px; font-weight: 500; margin-bottom: 8px; cursor: pointer;">
+                        <input type="checkbox" id="docOptSign" />
+                        <span>ลงนามในเอกสาร</span>
+                      </label>
+                      <div id="docSignatureSection" class="doc-extras-content" style="display: none;">
+                        <div style="margin-bottom: 8px;">
+                          <label class="field-label">ชื่อผู้ลงนาม</label>
+                          <input class="field-control" type="text" id="docSignName" placeholder="ชื่อ-นามสกุล" />
+                        </div>
+                        <label class="field-label">รูปลายเซ็น</label>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                          <div id="docSignPreview" style="width: 120px; height: 60px; border: 1px dashed #d1d5db; border-radius: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #fff;">
+                            <span id="docSignPlaceholder" style="font-size: 11px; color: #9ca3af;">ยังไม่มีลายเซ็น</span>
+                          </div>
+                          <div>
+                            <input type="file" id="docSignInput" accept="image/*" style="display: none;" />
+                            <button type="button" class="secondary-button" id="btnUploadSign" style="font-size: 12px;">เลือกรูป</button>
+                            <button type="button" class="secondary-button" id="btnRemoveSign" style="font-size: 12px; display: none; margin-top: 4px;">ลบลายเซ็น</button>
+                            <p style="font-size: 10px; color: var(--color-muted); margin-top: 4px;">PNG พื้นหลังใส แนะนำ</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div id="docSignDateSection" style="display: none; margin-top: 8px;">
+                        <label class="field-label">วันที่ลงนาม</label>
+                        <div style="display: flex; align-items: center; gap: 6px; max-width: 260px;">
+                          <input class="field-control" type="date" id="docSignDate" style="max-width: 200px;" />
+                          <button type="button" id="btnClearSignDate" title="ล้างวันที่" style="height: 32px; min-width: 32px; padding: 0 10px; border: 1px solid var(--color-border); background: #fff; color: var(--color-muted); border-radius: 8px; font-size: 11px; line-height: 1; cursor: pointer;">ล้าง</button>
+                        </div>
+                      </div>
+                      <div id="signPresetsBar" class="doc-extras-presets"></div>
+                    </div>
+
+                    <!-- Stamp Column -->
+                    <div class="doc-extras-card">
+                      <label style="display: flex; align-items: center; gap: 8px; font-weight: 500; margin-bottom: 8px; cursor: pointer;">
+                        <input type="checkbox" id="docOptStamp" />
+                        <span>ตราประทับ (Watermark)</span>
+                      </label>
+                      <div id="docStampSection" class="doc-extras-content" style="display: none;">
+                        <div style="display: flex; gap: 12px; margin-bottom: 8px;">
+                          <label style="font-size: 13px; cursor: pointer;"><input type="radio" name="stampSource" id="stampSourceLogo" value="logo" checked /> ใช้ Logo บริษัท</label>
+                          <label style="font-size: 13px; cursor: pointer;"><input type="radio" name="stampSource" id="stampSourceCustom" value="custom" /> อัพโหลดรูปใหม่</label>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                          <div id="docStampPreview" style="width: 100px; height: 100px; border: 1px dashed #d1d5db; border-radius: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #fff;">
+                            <span id="docStampPlaceholder" style="font-size: 11px; color: #9ca3af;">ไม่มีรูป</span>
+                          </div>
+                          <div id="docStampUploadWrap" style="display: none;">
+                            <input type="file" id="docStampInput" accept="image/*" style="display: none;" />
+                            <button type="button" class="secondary-button" id="btnUploadStamp" style="font-size: 12px;">เลือกรูป</button>
+                            <button type="button" class="secondary-button" id="btnRemoveStamp" style="font-size: 12px; display: none; margin-top: 4px;">ลบรูป</button>
+                            <p style="font-size: 10px; color: var(--color-muted); margin-top: 4px;">PNG พื้นหลังใส แนะนำ</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div id="stampPresetsBar" class="doc-extras-presets"></div>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+
+              <div class="table-card" id="docShipToSection" style="display: none;">
+                <div style="padding: var(--space-5);">
+                  <h3 style="margin: 0 0 var(--space-4) 0; font-size: 16px; font-weight: 600;">ที่อยู่จัดส่ง</h3>
+                  <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                    <div style="grid-column: span 2;">
+                      <label class="field-label">ชื่อผู้รับ</label>
+                      <input class="field-control" type="text" id="docShipToName" placeholder="ชื่อผู้รับ" />
+                    </div>
+                    <div style="grid-column: span 2;">
+                      <label class="field-label">ที่อยู่จัดส่ง</label>
+                      <textarea class="field-control" id="docShipToAddress" rows="2" placeholder="ที่อยู่สำหรับจัดส่ง"></textarea>
+                    </div>
+                    <div>
+                      <label class="field-label">โทรศัพท์</label>
+                      <input class="field-control" type="text" id="docShipToPhone" placeholder="เบอร์โทร" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="table-card" id="docTermsSection">
+                <div style="padding: var(--space-5);">
+                  <h3 style="margin: 0 0 var(--space-4) 0; font-size: 16px; font-weight: 600;">เงื่อนไขและข้อกำหนด</h3>
+                  <div style="margin-bottom: 12px;">
+                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                      <input type="checkbox" id="docOptPaymentTerms" checked />
+                      <span class="field-label" style="margin: 0;">แสดงเงื่อนไขการชำระเงิน</span>
+                    </label>
+                    <select class="field-control" id="docPaymentTerms" style="width: 100%; max-width: 300px; margin-bottom: 8px;">
+                      <option value="cash">เงินสด</option>
+                      <option value="credit7">เครดิต 7 วัน</option>
+                      <option value="credit15">เครดิต 15 วัน</option>
+                      <option value="credit30" selected>เครดิต 30 วัน</option>
+                      <option value="credit45">เครดิต 45 วัน</option>
+                      <option value="credit60">เครดิต 60 วัน</option>
+                      <option value="custom">กำหนดเอง...</option>
+                    </select>
+                    <input type="text" class="field-control" id="docPaymentTermsCustom" placeholder="ระบุเงื่อนไขการชำระเงินเอง" style="width: 100%; max-width: 300px; display: none;" />
+                  </div>
+                  <div>
+                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                      <input type="checkbox" id="docOptTerms" checked />
+                      <span class="field-label" style="margin: 0;">แสดงข้อกำหนดและเงื่อนไข</span>
+                    </label>
+                    <div id="docTermsTextWrapper">
+                      <textarea class="field-control" id="docTermsText" rows="3" placeholder="ระบุเงื่อนไขเพิ่มเติม เช่น การรับประกัน, เงื่อนไขการจัดส่ง ฯลฯ">1. ราคานี้รวมภาษีมูลค่าเพิ่ม 7% แล้ว
+2. ใบเสนอราคานี้มีอายุ 30 วัน นับจากวันที่ออก
+3. กรุณาชำระเงินภายในกำหนด</textarea>
+                    </div>
+                  </div>
+                  <div id="termsPresetsBar" style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px;"></div>
+                </div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-header">หมายเหตุ</div>
+                <div class="panel-body">
+                  <textarea class="field-control" id="docNote" rows="3" placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)"></textarea>
+                  <div id="notePresetsBar" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;"></div>
+                </div>
+              </div>
+
+            </div>
+
+            <div class="modal-overlay" id="bundledDocPickerModal" style="display: none;">
+              <div class="modal-content" style="max-width: 520px;">
+                <div class="modal-header">
+                  <h3>เลือกเอกสารพ่วง</h3>
+                  <button class="icon-button" id="closeBundledDocPicker">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                  </button>
+                </div>
+                <div class="modal-body" style="padding: var(--space-4);">
+                  <p style="font-size: 13px; color: var(--color-muted); margin: 0 0 16px 0;">เลือกประเภทเอกสารที่ต้องการสร้างพร้อมกัน โดยใช้ข้อมูลลูกค้าและรายการสินค้าเดียวกัน</p>
+                  <div id="bundledDocPickerGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px;"></div>
+                </div>
+                <div class="modal-footer">
+                  <button class="secondary-button" id="btnCancelBundledPicker">ยกเลิก</button>
+                  <button class="primary-button" id="btnConfirmBundledPicker">ยืนยัน</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-overlay" id="productPickerModal" style="display: none;">
+              <div class="modal-content" style="max-width: 600px; max-height: 80vh; overflow: auto;">
+                <div class="modal-header">
+                  <h3>เลือกสินค้า/บริการ</h3>
+                  <button class="icon-button" id="closeProductPickerModal">✕</button>
+                </div>
+                <div class="modal-body">
+                  <input class="field-control" type="text" id="productSearchInput" placeholder="ค้นหาสินค้า..." style="margin-bottom: 16px;" />
+                  <div id="productPickerList" style="display: flex; flex-direction: column; gap: 8px;">
+                    <div class="muted" style="padding: 24px; text-align: center;">กำลังโหลดรายการสินค้า...</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-overlay" id="invoicePickerModal" style="display: none;">
+              <div class="modal-content" style="max-width: 640px; max-height: 80vh; overflow: auto;">
+                <div class="modal-header">
+                  <h3>เลือกใบแจ้งหนี้ (Invoice)</h3>
+                  <button class="icon-button" id="closeInvoicePickerModal">✕</button>
+                </div>
+                <div class="modal-body">
+                  <input class="field-control" type="text" id="invoiceSearchInput" placeholder="ค้นหาเลขที่เอกสาร..." style="margin-bottom: 16px;" />
+                  <div id="invoicePickerList" style="display: flex; flex-direction: column; gap: 8px;">
+                    <div class="muted" style="padding: 24px; text-align: center;">กรุณาเลือกลูกค้าก่อน</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ประวัติเอกสาร -->
+          <section class="view" data-view="doc-history">
+            <div class="section-header">
+              <div class="section-actions">
+                <input type="text" class="field-control" id="docHistorySearch" placeholder="ค้นหา..." style="width: 200px;" />
+                <select class="field-control" id="docHistoryTypeFilter" style="width: 150px;">
+                  <option value="">ทุกประเภท</option>
+                  <option value="QUO">ใบเสนอราคา</option>
+                  <option value="INV">ใบแจ้งหนี้</option>
+                  <option value="BILL">ใบวางบิล</option>
+                  <option value="TAX">ใบกำกับภาษี</option>
+                  <option value="RCPT">ใบเสร็จรับเงิน</option>
+                  <option value="DO">ใบส่งของ</option>
+                  <option value="PO">ใบสั่งซื้อ</option>
+                  <option value="CN">ใบลดหนี้</option>
+                  <option value="PV">ใบสำคัญจ่าย</option>
+                  <option value="PR">ใบขอซื้อ</option>
+                </select>
+                <input type="text" class="field-control" id="docHistoryCustomerFilter" placeholder="กรองชื่อลูกค้า" style="width: 180px;" />
+                <button class="secondary-button" id="btnRefreshDocHistory">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                </button>
+              </div>
+            </div>
+            <div class="table-card">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width: 40px;"><input type="checkbox" id="selectAllDocHistory" /></th>
+                    <th style="width: 120px;">เลขที่เอกสาร</th>
+                    <th style="width: 130px;">ประเภท</th>
+                    <th>ลูกค้า</th>
+                    <th style="width: 100px;">วันที่</th>
+                    <th style="width: 120px;">ยอดรวม</th>
+                    <th style="width: 120px;">จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody id="docHistoryTbody">
+                  <tr>
+                    <td colspan="7" class="muted" style="text-align: center; padding: 40px;">
+                      <div id="docHistoryLoading">กำลังโหลด...</div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="docHistoryBatchBar" class="batch-action-bar" style="display: none;">
+              <span id="docHistorySelectedCount">0 รายการที่เลือก</span>
+              <div style="display: flex; gap: 8px;">
+                <button class="secondary-button" id="btnBatchPrintDocs"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg> พิมพ์</button>
+                <button class="primary-button" id="btnBatchDownloadDocs"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> ดาวน์โหลด</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- ติดตามชำระเงิน -->
+          <section class="view" data-view="payments">
+            <div class="section-header">
+              <div class="section-actions">
+                <select class="field-control" id="paymentsStatusFilter" style="width: 150px;">
+                  <option value="">ทั้งหมด</option>
+                  <option value="UNPAID">รอชำระ</option>
+                  <option value="OVERDUE">เกินกำหนด</option>
+                  <option value="PAID">ชำระแล้ว</option>
+                </select>
+                <button class="secondary-button" id="btnRefreshPayments">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                </button>
+              </div>
+            </div>
+            <div class="kpi-grid" style="margin-bottom: 20px;">
+              <div class="kpi-card">
+                <div class="kpi-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                </div>
+                <div class="kpi-content">
+                  <div class="kpi-label">รอชำระ</div>
+                  <div class="kpi-value" id="paymentsUnpaidTotal">฿0.00</div>
+                  <div class="kpi-meta" id="paymentsUnpaidCount">0 รายการ</div>
+                </div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-icon" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                </div>
+                <div class="kpi-content">
+                  <div class="kpi-label">เกินกำหนด</div>
+                  <div class="kpi-value" id="paymentsOverdueTotal">฿0.00</div>
+                  <div class="kpi-meta" id="paymentsOverdueCount">0 รายการ</div>
+                </div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                </div>
+                <div class="kpi-content">
+                  <div class="kpi-label">ชำระแล้ว</div>
+                  <div class="kpi-value" id="paymentsPaidTotal">฿0.00</div>
+                  <div class="kpi-meta" id="paymentsPaidCount">0 รายการ</div>
+                </div>
+              </div>
+            </div>
+            <div class="table-card">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width: 120px;">เลขที่เอกสาร</th>
+                    <th style="width: 100px;">ประเภท</th>
+                    <th>ลูกค้า</th>
+                    <th style="width: 120px;">ยอดรวม</th>
+                    <th style="width: 100px;">ครบกำหนด</th>
+                    <th style="width: 100px;">สถานะ</th>
+                    <th style="width: 150px;">จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody id="paymentsTbody">
+                  <tr>
+                    <td colspan="7" class="muted" style="text-align: center; padding: 40px;">
+                      <div id="paymentsLoading">กำลังโหลด...</div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="view" data-view="companies">
+            <div class="section-header">
+              <div class="section-actions">
+                <button class="primary-button" id="btnAddCompany">+ เพิ่มบริษัท</button>
+              </div>
+            </div>
+            <div id="companyList">
+              <div class="company-card">
+                <div class="company-info muted">ยังไม่มีข้อมูลบริษัท กดปุ่ม "+ เพิ่มบริษัท" เพื่อเริ่มต้น</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" data-view="settings">
+
+            <!-- Settings Tabs -->
+            <div class="tabs" id="settingsTabs">
+              <button class="tab-btn active" onclick="switchSettingsTab('connection')">เชื่อมต่อ</button>
+              <button class="tab-btn" onclick="switchSettingsTab('display')">การแสดงผล</button>
+              <button class="tab-btn" onclick="switchSettingsTab('doccolors')">สีเอกสาร</button>
+              <button class="tab-btn" onclick="switchSettingsTab('docno')">เลขที่เอกสาร</button>
+              <button class="tab-btn" onclick="switchSettingsTab('defaults')">ค่าเริ่มต้น</button>
+            </div>
+
+            <!-- Tab: Connection -->
+            <div class="tab-content active" id="settingsTab-connection">
+              <div class="settings-card">
+                <h3>เชื่อมต่อ Google Sheets</h3>
+                <p class="muted" style="margin-bottom: 12px;">ใส่ Google Sheets ID ของคุณเพื่อใช้เป็นฐานข้อมูล ระบบจะสร้างแท็บ + headers ให้อัตโนมัติ</p>
+                <div class="settings-row settings-connect-row" style="align-items: flex-end; gap: 8px;">
+                  <div class="settings-connect-input-wrap" style="flex: 1;">
+                    <label class="field-label">Google Sheets ID</label>
+                    <input class="field-control" type="text" id="sheetsIdInput" placeholder="เช่น 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms" style="width: 100%; font-family: monospace; font-size: 13px;" />
+                    <div class="settings-connect-actions">
+                      <button class="primary-button" id="btnConnectSheets" style="white-space: nowrap;">เชื่อมต่อ</button>
+                    </div>
+                    <p class="muted" style="margin-top: 4px; font-size: 11px;">คัดลอก ID จาก URL ของ Google Sheets: https://docs.google.com/spreadsheets/d/<strong>[ID อยู่ตรงนี้]</strong>/edit</p>
+                  </div>
+                </div>
+                <div id="sheetsStatus" style="margin-top: 10px;"></div>
+              </div>
+            </div><!-- end tab connection -->
+
+            <!-- Tab: Display -->
+            <div class="tab-content" id="settingsTab-display">
+              <div class="settings-card">
+                <h3>การแสดงผล</h3>
+                <div class="settings-row">
+                  <span>ฟอนต์</span>
+                  <select class="field-control" id="settingFont" style="width: 180px;">
+                    <option value="sarabun">Sarabun</option>
+                    <option value="noto">Noto Sans Thai</option>
+                    <option value="ibm">IBM Plex Sans Thai</option>
+                  </select>
+                </div>
+                <div class="settings-row">
+                  <span>ธีมสี</span>
+                  <select class="field-control" id="settingTheme" style="width: 180px;">
+                    <option value="blue">Deep Blue</option>
+                    <option value="green">Deep Green</option>
+                    <option value="purple">Deep Purple</option>
+                  </select>
+                </div>
+                <button class="primary-button" id="btnSaveDisplaySettings" style="margin-top: 16px;">บันทึกการแสดงผล</button>
+              </div>
+            </div><!-- end tab display -->
+
+            <!-- Tab: Document Colors -->
+            <div class="tab-content" id="settingsTab-doccolors">
+              <div class="settings-card">
+                <h3>สีเอกสารแต่ละประเภท</h3>
+                <p class="muted" style="margin-bottom: 16px;">เลือกสีธีมสำหรับแต่ละประเภทเอกสาร สีจะแสดงในหัวเอกสาร ชื่อบริษัท และยอดรวม</p>
+                <div id="docColorGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;"></div>
+                <button class="primary-button" id="btnSaveDocColors" style="margin-top: 20px;">บันทึกสีเอกสาร</button>
+              </div>
+            </div><!-- end tab doccolors -->
+
+            <!-- Tab: Document Number -->
+            <div class="tab-content" id="settingsTab-docno">
+              <div class="settings-card">
+                <h3>รูปแบบเลขที่เอกสาร</h3>
+                <p class="muted" style="margin-bottom: 12px;">กำหนดรูปแบบเลขที่เอกสารอัตโนมัติ เลขจะรันต่อเนื่องไม่ข้าม</p>
+                <div class="settings-row">
+                  <span>รูปแบบ</span>
+                  <select class="field-control" id="settingDocNoPattern" style="width: 320px;">
+                    <option value="A">QUO6902-0001 — พ.ศ. 2 หลัก + เดือน (reset ทุกเดือน)</option>
+                    <option value="B">QUO69-0001 — พ.ศ. 2 หลัก (reset ทุกปี)</option>
+                    <option value="C">QUO2569-0001 — พ.ศ. 4 หลัก (reset ทุกปี)</option>
+                    <option value="D">QUO2602-0001 — ค.ศ. 2 หลัก + เดือน (reset ทุกเดือน)</option>
+                    <option value="E">QUO2026-0001 — ค.ศ. 4 หลัก (reset ทุกปี)</option>
+                  </select>
+                </div>
+                <div class="settings-row">
+                  <span>จำนวนหลัก running</span>
+                  <select class="field-control" id="settingDocNoDigits" style="width: 80px;">
+                    <option value="3">3</option>
+                    <option value="4" selected>4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                  </select>
+                </div>
+                <div class="settings-row">
+                  <span>ตัวคั่น</span>
+                  <select class="field-control" id="settingDocNoSeparator" style="width: 80px;">
+                    <option value="-">-</option>
+                    <option value="/">/</option>
+                  </select>
+                </div>
+                <div class="settings-row" style="align-items: flex-start;">
+                  <span>ตัวอย่าง</span>
+                  <span id="docNoPreviewText" style="font-family: monospace; font-size: 14px; font-weight: 600; color: var(--color-primary);">QUO6902-0001</span>
+                </div>
+                <details style="margin-top: 8px;">
+                  <summary style="cursor: pointer; font-size: 13px; color: var(--color-muted);">ปรับ prefix แต่ละประเภท</summary>
+                  <div style="margin-top: 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px;">
+                    <div class="settings-row" style="gap: 4px;"><span style="width: 70px; font-size: 12px;">ใบเสนอราคา</span><input class="field-control docno-prefix" data-doctype="QUO" value="QUO" style="width: 80px; font-size: 12px;" /></div>
+                    <div class="settings-row" style="gap: 4px;"><span style="width: 70px; font-size: 12px;">ใบแจ้งหนี้</span><input class="field-control docno-prefix" data-doctype="INV" value="INV" style="width: 80px; font-size: 12px;" /></div>
+                    <div class="settings-row" style="gap: 4px;"><span style="width: 70px; font-size: 12px;">ใบวางบิล</span><input class="field-control docno-prefix" data-doctype="BILL" value="BN" style="width: 80px; font-size: 12px;" /></div>
+                    <div class="settings-row" style="gap: 4px;"><span style="width: 70px; font-size: 12px;">ใบกำกับภาษี</span><input class="field-control docno-prefix" data-doctype="TAX" value="TAX" style="width: 80px; font-size: 12px;" /></div>
+                    <div class="settings-row" style="gap: 4px;"><span style="width: 70px; font-size: 12px;">ใบเสร็จรับเงิน</span><input class="field-control docno-prefix" data-doctype="RCPT" value="RCP" style="width: 80px; font-size: 12px;" /></div>
+                    <div class="settings-row" style="gap: 4px;"><span style="width: 70px; font-size: 12px;">ใบส่งของ</span><input class="field-control docno-prefix" data-doctype="DO" value="DO" style="width: 80px; font-size: 12px;" /></div>
+                    <div class="settings-row" style="gap: 4px;"><span style="width: 70px; font-size: 12px;">ใบสั่งซื้อ</span><input class="field-control docno-prefix" data-doctype="PO" value="PO" style="width: 80px; font-size: 12px;" /></div>
+                    <div class="settings-row" style="gap: 4px;"><span style="width: 70px; font-size: 12px;">ใบลดหนี้</span><input class="field-control docno-prefix" data-doctype="CN" value="CN" style="width: 80px; font-size: 12px;" /></div>
+                    <div class="settings-row" style="gap: 4px;"><span style="width: 70px; font-size: 12px;">ใบสำคัญจ่าย</span><input class="field-control docno-prefix" data-doctype="PV" value="PV" style="width: 80px; font-size: 12px;" /></div>
+                    <div class="settings-row" style="gap: 4px;"><span style="width: 70px; font-size: 12px;">ใบขอซื้อ</span><input class="field-control docno-prefix" data-doctype="PR" value="PR" style="width: 80px; font-size: 12px;" /></div>
+                  </div>
+                </details>
+                <button class="primary-button" id="btnSaveDocNoSettings" style="margin-top: 16px;">บันทึกรูปแบบเลขที่เอกสาร</button>
+              </div>
+            </div><!-- end tab docno -->
+
+            <!-- Tab: Defaults -->
+            <div class="tab-content" id="settingsTab-defaults">
+              <div class="settings-card">
+                <h3>ค่าเริ่มต้นเอกสาร</h3>
+                <div class="settings-row">
+                  <span>VAT (%)</span>
+                  <input class="field-control" id="settingVat" type="number" value="7" style="width: 100px;" />
+                </div>
+                <div class="settings-row">
+                  <span>หัก ณ ที่จ่าย (%)</span>
+                  <input class="field-control" id="settingWht" type="number" value="3" style="width: 100px;" />
+                </div>
+                <div class="settings-row">
+                  <span>สกุลเงิน</span>
+                  <input class="field-control" id="settingCurrency" list="currencyList" style="width: 100px;" placeholder="THB" />
+                  <datalist id="currencyList">
+                    <option value="THB">
+                    <option value="USD">
+                    <option value="EUR">
+                    <option value="GBP">
+                    <option value="JPY">
+                    <option value="CNY">
+                    <option value="KRW">
+                    <option value="SGD">
+                    <option value="MYR">
+                    <option value="AUD">
+                  </datalist>
+                </div>
+                <div class="settings-row">
+                  <span>ภาษาเอกสาร</span>
+                  <select class="field-control" id="settingDocLang" style="width: 120px;">
+                    <option value="th">ไทย</option>
+                    <option value="en">English</option>
+                  </select>
+                </div>
+                <button class="primary-button" id="btnSaveDefaultSettings" style="margin-top: 16px;">บันทึกค่าเริ่มต้น</button>
+              </div>
+            </div><!-- end tab defaults -->
+
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <!-- Preview Modal (global) -->
+    <div class="modal-overlay" id="previewModal" style="display: none;">
+      <div class="modal-content preview-modal-content">
+        <div class="modal-header">
+          <h3>พรีวิวเอกสาร</h3>
+          <button class="icon-button" id="closePreviewModal">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+        <div class="modal-body preview-modal-body" id="previewContent">
+          <div class="a4-preview-wrapper">
+            <div class="preview" style="min-height: 500px;">
+              <div class="preview-body muted">Preview จะปรากฏเมื่อมีข้อมูลจริง</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer preview-modal-footer">
+          <div class="preview-actions-left">
+            <button class="btn-icon-text" id="btnPrintDoc">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+              <span>พิมพ์</span>
+            </button>
+            <button class="btn-icon-text btn-pdf" id="btnDownloadPDF">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+              <span>ดาวน์โหลด PDF</span>
+            </button>
+          </div>
+          <div class="preview-zoom-bar">
+            <button id="btnZoomOut" title="ซูมออก">−</button>
+            <span class="zoom-label" id="zoomLabel">100%</span>
+            <button id="btnZoomIn" title="ซูมเข้า">+</button>
+            <button id="btnZoomFit" title="พอดีหน้าจอ" style="font-size: 12px; width: auto; padding: 0 8px;">พอดี</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Document Modal (global) -->
+    <div class="modal-overlay" id="editDocModal" style="display: none;">
+      <div class="modal-content" style="max-width: 700px; max-height: 90vh; overflow: auto;">
+        <div class="modal-header">
+          <h3 id="editDocModalTitle">แก้ไขเอกสาร</h3>
+          <button class="icon-button" id="closeEditDocModal">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+        <div class="modal-body" style="padding: var(--space-5);">
+          <input type="hidden" id="editDocId" />
+          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+            <div>
+              <label class="field-label">ประเภทเอกสาร</label>
+              <select class="field-control" id="editDocType" disabled>
+                <option value="QUO">ใบเสนอราคา</option>
+                <option value="INV">ใบแจ้งหนี้</option>
+                <option value="BILL">ใบวางบิล</option>
+                <option value="TAX">ใบกำกับภาษี</option>
+                <option value="RCPT">ใบเสร็จรับเงิน</option>
+                <option value="DO">ใบส่งของ</option>
+                <option value="PO">ใบสั่งซื้อ</option>
+                <option value="CN">ใบลดหนี้</option>
+                <option value="PV">ใบสำคัญจ่าย</option>
+                <option value="PR">ใบขอซื้อ</option>
+              </select>
+            </div>
+            <div>
+              <label class="field-label">เลขที่เอกสาร</label>
+              <input class="field-control" type="text" id="editDocNo" readonly />
+            </div>
+            <div>
+              <label class="field-label">วันที่เอกสาร</label>
+              <input class="field-control" type="date" id="editDocDate" />
+            </div>
+            <div>
+              <label class="field-label">วันครบกำหนด</label>
+              <input class="field-control" type="date" id="editDocDueDate" />
+            </div>
+          </div>
+          <h4 style="margin: 16px 0 8px; font-size: 14px; font-weight: 600;">ข้อมูลลูกค้า</h4>
+          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+            <div>
+              <label class="field-label">ชื่อลูกค้า</label>
+              <input class="field-control" type="text" id="editDocCustomerName" />
+            </div>
+            <div>
+              <label class="field-label">เลขผู้เสียภาษี</label>
+              <input class="field-control" type="text" id="editDocCustomerTaxId" />
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <label class="field-label">ที่อยู่</label>
+              <input class="field-control" type="text" id="editDocCustomerAddress" />
+            </div>
+            <div>
+              <label class="field-label">โทรศัพท์</label>
+              <input class="field-control" type="text" id="editDocCustomerPhone" />
+            </div>
+            <div>
+              <label class="field-label">อีเมล</label>
+              <input class="field-control" type="text" id="editDocCustomerEmail" />
+            </div>
+          </div>
+          <h4 style="margin: 16px 0 8px; font-size: 14px; font-weight: 600;">รายการสินค้า/บริการ</h4>
+          <div style="overflow-x: auto; margin-bottom: 8px;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px;" id="editDocItemsTable">
+              <thead>
+                <tr style="background: var(--bg-secondary); border-bottom: 1px solid var(--border-color);">
+                  <th style="padding: 6px 8px; text-align: left; width: 36px;">#</th>
+                  <th style="padding: 6px 8px; text-align: left;">รายการ</th>
+                  <th style="padding: 6px 8px; text-align: center; width: 70px;">จำนวน</th>
+                  <th style="padding: 6px 8px; text-align: center; width: 70px;">หน่วย</th>
+                  <th style="padding: 6px 8px; text-align: right; width: 100px;">ราคา/หน่วย</th>
+                  <th style="padding: 6px 8px; text-align: right; width: 90px;">รวม</th>
+                  <th style="padding: 6px 8px; width: 40px;"></th>
+                </tr>
+              </thead>
+              <tbody id="editDocItemsTbody"></tbody>
+            </table>
+          </div>
+          <button type="button" class="secondary-button" id="btnAddEditDocItem" style="font-size: 13px; padding: 6px 14px;">+ เพิ่มรายการ</button>
+          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+            <div>
+              <label class="field-label">ยอดสุทธิ</label>
+              <input class="field-control" type="text" id="editDocGrandTotal" readonly style="font-weight: 700; font-size: 16px;" />
+            </div>
+          </div>
+          <div style="margin-bottom: 16px;">
+            <label class="field-label">หมายเหตุ</label>
+            <textarea class="field-control" id="editDocNote" rows="2"></textarea>
+          </div>
+          <h4 style="margin: 16px 0 8px; font-size: 14px; font-weight: 600;">เงื่อนไขและข้อกำหนด</h4>
+          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+            <div>
+              <label class="field-label">เงื่อนไขการชำระเงิน</label>
+              <select class="field-control" id="editDocPaymentTerms">
+                <option value="">-- ไม่ระบุ --</option>
+                <option value="cash">เงินสด</option>
+                <option value="credit7">เครดิต 7 วัน</option>
+                <option value="credit15">เครดิต 15 วัน</option>
+                <option value="credit30">เครดิต 30 วัน</option>
+                <option value="credit45">เครดิต 45 วัน</option>
+                <option value="credit60">เครดิต 60 วัน</option>
+                <option value="custom">กำหนดเอง...</option>
+              </select>
+              <input type="text" class="field-control" id="editDocPaymentTermsCustom" placeholder="ระบุเงื่อนไขเอง" style="margin-top: 6px; display: none;" />
+            </div>
+          </div>
+          <div>
+            <label class="field-label">ข้อกำหนดและเงื่อนไข</label>
+            <textarea class="field-control" id="editDocTermsText" rows="3" placeholder="ระบุเงื่อนไขเพิ่มเติม"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="secondary-button" id="btnCancelEditDoc">ยกเลิก</button>
+          <button class="primary-button" id="btnSaveEditDoc">บันทึก</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Product Modal -->
+    <div class="modal-overlay" id="productModal" style="display: none;">
+      <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+          <h3 id="productModalTitle">เพิ่มสินค้า/บริการ</h3>
+          <button class="icon-button" id="closeProductModal">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+        <div class="modal-body" style="padding-top: var(--space-6);">
+          <input type="hidden" id="productEditId" />
+          <div class="form-group">
+            <label class="field-label">รหัสสินค้า</label>
+            <input class="field-control" type="text" id="productCode" placeholder="เช่น P001" />
+          </div>
+          <div class="form-group">
+            <label class="field-label">ชื่อสินค้า/บริการ</label>
+            <input class="field-control" type="text" id="productName" placeholder="ชื่อสินค้าหรือบริการ" required />
+          </div>
+          <div class="form-group">
+            <label class="field-label">รายละเอียด</label>
+            <textarea class="field-control" id="productDescription" rows="2" placeholder="รายละเอียดสินค้า (ถ้ามี)"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="field-label">รายละเอียดงานบริการ</label>
+            <textarea class="field-control" id="productServiceDesc" rows="3" placeholder="รายละเอียดที่จะแสดงอัตโนมัติเมื่อเลือกบริการนี้ในเอกสาร (ถ้ามี)"></textarea>
+            <p class="muted" style="margin-top: 4px; font-size: 11px;">แต่ละบรรทัดจะแสดงเป็นรายการย่อยในเอกสาร</p>
+          </div>
+          <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px;">
+            <div class="form-group">
+              <label class="field-label">ราคาขาย</label>
+              <input class="field-control" type="number" id="productPrice" placeholder="0.00" step="0.01" min="0" />
+            </div>
+            <div class="form-group">
+              <label class="field-label">ราคาซื้อ</label>
+              <input class="field-control" type="number" id="productCostPrice" placeholder="0.00" step="0.01" min="0" />
+            </div>
+            <div class="form-group">
+              <label class="field-label">หน่วย</label>
+              <input class="field-control" type="text" id="productUnit" placeholder="เช่น ชิ้น, เดือน" />
+            </div>
+            <div class="form-group">
+              <label class="field-label">VAT (%)</label>
+              <input class="field-control" type="number" id="productVatRate" value="7" min="0" max="100" step="0.01" placeholder="0" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="field-label">สถานะ</label>
+            <select class="field-control" id="productStatus">
+              <option value="ACTIVE">ใช้งาน</option>
+              <option value="INACTIVE">ไม่ใช้งาน</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="secondary-button" id="btnCancelProduct">ยกเลิก</button>
+          <button class="primary-button" id="btnSaveProduct">บันทึก</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Customer Modal -->
+    <div class="modal-overlay" id="customerModal" style="display: none;">
+      <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+          <h3 id="customerModalTitle">เพิ่มลูกค้า</h3>
+          <button class="icon-button" id="closeCustomerModal">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+        <div class="modal-body" style="padding-top: var(--space-6);">
+          <input type="hidden" id="customerEditId" />
+          <div class="form-group">
+            <label class="field-label">ประเภท</label>
+            <select class="field-control" id="customerType">
+              <option value="CUSTOMER">ลูกค้า</option>
+              <option value="VENDOR">ผู้ขาย</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="field-label" id="customerCodeLabel">รหัสลูกค้า</label>
+            <input class="field-control" type="text" id="customerCode" placeholder="เช่น CUS001" />
+          </div>
+          <div class="form-group">
+            <label class="field-label">ชื่อลูกค้า/บริษัท</label>
+            <input class="field-control" type="text" id="customerName" placeholder="ชื่อลูกค้าหรือบริษัท" required />
+            <label style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:13px;cursor:pointer;">
+              <input type="checkbox" id="customerIsHeadOffice" /> สำนักงานใหญ่
+            </label>
+          </div>
+          <div class="form-group">
+            <label class="field-label">เลขประจำตัวผู้เสียภาษี</label>
+            <input class="field-control" type="text" id="customerTaxId" placeholder="0-0000-00000-00-0" />
+          </div>
+          <div class="form-group">
+            <label class="field-label">ที่อยู่</label>
+            <textarea class="field-control" id="customerAddress" rows="2" placeholder="ที่อยู่สำหรับออกเอกสาร"></textarea>
+          </div>
+          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="form-group">
+              <label class="field-label">โทรศัพท์</label>
+              <input class="field-control" type="text" id="customerPhone" placeholder="02-XXX-XXXX" />
+            </div>
+            <div class="form-group">
+              <label class="field-label">อีเมล</label>
+              <input class="field-control" type="email" id="customerEmail" placeholder="email@example.com" />
+            </div>
+          </div>
+          <div class="form-group" id="customerContactsSection">
+            <label class="field-label">ผู้ติดต่อ</label>
+            <div id="customerContactsList"></div>
+            <button type="button" class="secondary-button" id="btnAddContact" style="margin-top:8px;font-size:13px;padding:6px 12px;">+ เพิ่มผู้ติดต่อ</button>
+          </div>
+          <div class="form-group">
+            <label class="field-label">สถานะ</label>
+            <select class="field-control" id="customerStatus">
+              <option value="ACTIVE">ใช้งาน</option>
+              <option value="INACTIVE">ไม่ใช้งาน</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="secondary-button" id="btnCancelCustomer">ยกเลิก</button>
+          <button class="primary-button" id="btnSaveCustomer">บันทึก</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Salesperson Modal -->
+    <div class="modal-overlay" id="salespersonModal" style="display: none;">
+      <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+          <h3 id="salespersonModalTitle">เพิ่มพนักงานขาย</h3>
+          <button class="icon-button" id="closeSalespersonModal">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+        <div class="modal-body" style="padding-top: var(--space-6);">
+          <input type="hidden" id="salespersonEditId" />
+          <div class="form-group">
+            <label class="field-label">รหัสพนักงาน</label>
+            <input class="field-control" type="text" id="salespersonCode" placeholder="เช่น SP001" />
+          </div>
+          <div class="form-group">
+            <label class="field-label">ชื่อพนักงานขาย</label>
+            <input class="field-control" type="text" id="salespersonName" placeholder="ชื่อพนักงานขาย" required />
+          </div>
+          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="form-group">
+              <label class="field-label">โทรศัพท์</label>
+              <input class="field-control" type="text" id="salespersonPhone" placeholder="02-XXX-XXXX" />
+            </div>
+            <div class="form-group">
+              <label class="field-label">อีเมล</label>
+              <input class="field-control" type="email" id="salespersonEmail" placeholder="email@example.com" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="field-label">สถานะ</label>
+            <select class="field-control" id="salespersonStatus">
+              <option value="ACTIVE">ใช้งาน</option>
+              <option value="INACTIVE">ไม่ใช้งาน</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="secondary-button" id="btnCancelSalesperson">ยกเลิก</button>
+          <button class="primary-button" id="btnSaveSalesperson">บันทึก</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Company Modal -->
+    <div class="modal-overlay" id="companyModal" style="display: none;">
+      <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+          <h3 id="companyModalTitle">เพิ่มบริษัท</h3>
+          <button class="icon-button" id="btnCloseCompanyModal">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+        <div class="modal-body" style="padding-top: var(--space-6);">
+          <input type="hidden" id="companyEditId" />
+          <div class="form-group">
+            <label class="field-label">โลโก้บริษัท</label>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="position: relative;">
+                <div id="companyLogoPreview" style="width: 80px; height: 80px; border: 2px dashed var(--color-border); border-radius: 8px; display: flex; align-items: center; justify-content: center; background: var(--color-bg); overflow: hidden;">
+                  <span style="color: var(--color-muted); font-size: 12px;">ไม่มีโลโก้</span>
+                </div>
+                <button type="button" id="btnRemoveLogo" style="display: none; position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%; border: none; background: #e53e3e; color: #fff; font-size: 12px; line-height: 20px; text-align: center; cursor: pointer; padding: 0;" title="ลบโลโก้">✕</button>
+              </div>
+              <div style="flex: 1;">
+                <input type="file" id="companyLogoInput" accept="image/*" style="display: none;" />
+                <button type="button" class="secondary-button" id="btnUploadLogo" style="width: 100%;">เลือกรูปภาพ</button>
+                <p style="font-size: 11px; color: var(--color-muted); margin-top: 4px;">รองรับ JPG, PNG (แนะนำขนาด 200x200px)</p>
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="field-label">รหัสบริษัท</label>
+            <input class="field-control" type="text" id="companyCode" placeholder="เช่น C001" />
+          </div>
+          <div class="form-group">
+            <label class="field-label">ชื่อบริษัท</label>
+            <input class="field-control" type="text" id="companyName" placeholder="ชื่อบริษัท" required />
+            <label style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:13px;cursor:pointer;">
+              <input type="checkbox" id="companyIsHeadOffice" /> สำนักงานใหญ่
+            </label>
+          </div>
+          <div class="form-group">
+            <label class="field-label">เลขประจำตัวผู้เสียภาษี</label>
+            <input class="field-control" type="text" id="companyTaxId" placeholder="0-0000-00000-00-0" />
+          </div>
+          <div class="form-group">
+            <label class="field-label">ที่อยู่</label>
+            <textarea class="field-control" id="companyAddress" rows="3" placeholder="ที่อยู่บริษัท"></textarea>
+          </div>
+          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="form-group">
+              <label class="field-label">โทรศัพท์</label>
+              <input class="field-control" type="text" id="companyPhone" placeholder="02-XXX-XXXX" />
+            </div>
+            <div class="form-group">
+              <label class="field-label">อีเมล</label>
+              <input class="field-control" type="email" id="companyEmail" placeholder="email@company.com" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="field-label">สถานะ</label>
+            <select class="field-control" id="companyStatus">
+              <option value="ACTIVE">ใช้งาน</option>
+              <option value="INACTIVE">ไม่ใช้งาน</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="secondary-button" id="btnCancelCompany">ยกเลิก</button>
+          <button class="primary-button" id="btnSaveCompany">บันทึก</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Bottom Navigation (Mobile) ===== -->
+    <nav class="bottom-nav" id="bottomNav">
+      <div class="bottom-nav-items">
+        <button class="bottom-nav-item active" data-view="dashboard" onclick="setView('dashboard');updateBottomNavActive('dashboard');">
+          <span class="bnav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg></span><span>แดชบอร์ด</span>
+        </button>
+        <button class="bottom-nav-item" data-view="documents" onclick="setView('documents');updateBottomNavActive('documents');">
+          <span class="bnav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg></span><span>ออกเอกสาร</span>
+        </button>
+        <button class="bottom-nav-item" data-view="doc-history" onclick="setView('doc-history');updateBottomNavActive('doc-history');">
+          <span class="bnav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></span><span>ประวัติ</span>
+        </button>
+        <button class="bottom-nav-item" data-view="payments" onclick="setView('payments');updateBottomNavActive('payments');">
+          <span class="bnav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg></span><span>ชำระเงิน</span>
+        </button>
+        <button class="bottom-nav-item" id="mobileMoreBtn" onclick="openBottomSheet();">
+          <span class="bnav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></span><span>เพิ่มเติม</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- ===== Bottom Sheet (More Menu) ===== -->
+    <div class="bottom-sheet-overlay" id="bottomSheetOverlay" onclick="closeBottomSheet();"></div>
+    <div class="bottom-sheet" id="bottomSheet">
+      <div class="bottom-sheet-handle"></div>
+      <button class="bottom-sheet-item" data-view="products" onclick="setView('products');closeBottomSheet();updateBottomNavActive('products');"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg> สินค้า/บริการ</button>
+      <button class="bottom-sheet-item" data-view="customers" onclick="setView('customers');closeBottomSheet();updateBottomNavActive('customers');"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> ลูกค้า/ผู้ขาย</button>
+      <button class="bottom-sheet-item" data-view="salespersons" onclick="setView('salespersons');closeBottomSheet();updateBottomNavActive('salespersons');"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> พนักงานขาย</button>
+      <div class="bottom-sheet-divider"></div>
+      <button class="bottom-sheet-item" data-view="companies" onclick="setView('companies');closeBottomSheet();updateBottomNavActive('companies');"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg> บริษัทของฉัน</button>
+      <button class="bottom-sheet-item" data-view="settings" onclick="setView('settings');closeBottomSheet();updateBottomNavActive('settings');"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg> ตั้งค่า</button>
+    </div>
+
+    <footer class="app-footer">
+      <div class="footer-content">
+        <span>© 2026 Grid Pro - จัดการธุรกิจอย่างมืออาชีพ</span>
+        <a href="https://www.facebook.com/profile.php?id=61586950178809" target="_blank" rel="noopener noreferrer" class="footer-link" title="Facebook">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+          </svg>
+        </a>
+      </div>
+    </footer>
+
+    <!-- Preset Save Dialog -->
+    <div id="presetSaveDialog" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;">
+      <div style="background:#fff;border-radius:12px;padding:24px;width:90%;max-width:360px;box-shadow:0 8px 30px rgba(0,0,0,0.18);">
+        <h3 id="presetSaveDialogTitle" style="margin:0 0 16px;font-size:16px;font-weight:600;"></h3>
+        <div style="margin-bottom:12px;">
+          <label style="font-size:13px;font-weight:500;display:block;margin-bottom:4px;">ชื่อ <span style="color:#ef4444;">*</span></label>
+          <input id="presetSaveDialogName" class="field-control" type="text" placeholder="ตั้งชื่อชุดนี้" style="width:100%;" />
+        </div>
+        <div style="margin-bottom:16px;">
+          <label style="font-size:13px;font-weight:500;display:block;margin-bottom:4px;">หมายเหตุ</label>
+          <input id="presetSaveDialogNote" class="field-control" type="text" placeholder="รายละเอียดเพิ่มเติม (ไม่บังคับ)" style="width:100%;" />
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button type="button" class="secondary-button" onclick="closePresetSaveDialog()" style="font-size:13px;padding:8px 16px;">ยกเลิก</button>
+          <button type="button" class="primary-button" id="presetSaveDialogConfirm" style="font-size:13px;padding:8px 16px;">บันทึก</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
+    <!-- ======= LOCAL DEV: uncomment below, comment out Apps Script include ======= -->
+    <!-- <script src="app.js"></script> -->
+    <!-- ======= APPS SCRIPT: uncomment below, comment out local script ======= -->
+    <?!= include("js_config"); ?>
+    <?!= include("js_state"); ?>
+    <?!= include("js_utils"); ?>
+    <?!= include("js_dashboard"); ?>
+    <?!= include("js_master"); ?>
+    <?!= include("js_company"); ?>
+    <?!= include("js_document"); ?>
+    <?!= include("js_preview"); ?>
+    <?!= include("js_dochistory"); ?>
+    <?!= include("js_payments"); ?>
+    <?!= include("js_dbconfig"); ?>
+    <?!= include("js_whatsnew"); ?>
+    <?!= include("js_init"); ?>
+
+    <div id="globalLoader" class="global-loader-overlay">
+      <div class="loader-grid">
+        <div class="loader-grid-dot"></div>
+        <div class="loader-grid-dot"></div>
+        <div class="loader-grid-dot"></div>
+        <div class="loader-grid-dot"></div>
+        <div class="loader-grid-dot"></div>
+        <div class="loader-grid-dot"></div>
+        <div class="loader-grid-dot"></div>
+        <div class="loader-grid-dot"></div>
+        <div class="loader-grid-dot"></div>
+      </div>
+      <div class="loader-label">กำลังดำเนินการ...</div>
+    </div>
+  </body>
+</html>

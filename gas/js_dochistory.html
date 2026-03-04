@@ -1,0 +1,789 @@
+<script>
+// ===== Document History Page =====
+var docHistoryState = {
+  documents: [],
+  filteredDocs: [],
+  typeFilter: "",
+  customerFilter: "",
+  searchText: ""
+};
+
+var editDocItems = [];
+var editDocNextId = 1;
+var editDocOriginalJson = {};
+
+function renderEditDocItems() {
+  var tbody = document.getElementById("editDocItemsTbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  if (!editDocItems.length) {
+    var tr = document.createElement("tr");
+    var td = document.createElement("td");
+    td.colSpan = 7;
+    td.className = "muted";
+    td.style.cssText = "text-align: center; padding: 20px;";
+    td.textContent = 'กดปุ่ม "+ เพิ่มรายการ" เพื่อเพิ่มสินค้า/บริการ';
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    return;
+  }
+
+  editDocItems.forEach(function(item, index) {
+    var tr = document.createElement("tr");
+    tr.style.borderBottom = "1px solid var(--border-color, #e5e7eb)";
+    tr.dataset.editItemId = item._editId;
+
+    var tdNo = document.createElement("td");
+    tdNo.style.padding = "6px 8px";
+    tdNo.textContent = index + 1;
+
+    var tdName = document.createElement("td");
+    tdName.style.padding = "4px 4px";
+    var nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.className = "field-control";
+    nameInput.value = item.name || "";
+    nameInput.placeholder = "ชื่อรายการ";
+    nameInput.style.cssText = "width: 100%; font-size: 13px;";
+    nameInput.onchange = function() { item.name = nameInput.value; };
+    tdName.appendChild(nameInput);
+
+    var tdQty = document.createElement("td");
+    tdQty.style.padding = "4px 4px";
+    var qtyInput = document.createElement("input");
+    qtyInput.type = "number";
+    qtyInput.className = "field-control";
+    qtyInput.value = item.qty || 0;
+    qtyInput.min = "0";
+    qtyInput.step = "1";
+    qtyInput.style.cssText = "width: 65px; font-size: 13px; text-align: center;";
+    qtyInput.onchange = function() {
+      item.qty = parseFloat(qtyInput.value) || 0;
+      totalCell.textContent = formatMoney((item.qty || 0) * (item.price || 0));
+      recalcEditDocTotals();
+    };
+    tdQty.appendChild(qtyInput);
+
+    var tdUnit = document.createElement("td");
+    tdUnit.style.padding = "4px 4px";
+    var unitInput = document.createElement("input");
+    unitInput.type = "text";
+    unitInput.className = "field-control";
+    unitInput.value = item.unit || "";
+    unitInput.placeholder = "หน่วย";
+    unitInput.style.cssText = "width: 65px; font-size: 13px; text-align: center;";
+    unitInput.onchange = function() { item.unit = unitInput.value; };
+    tdUnit.appendChild(unitInput);
+
+    var tdPrice = document.createElement("td");
+    tdPrice.style.padding = "4px 4px";
+    var priceInput = document.createElement("input");
+    priceInput.type = "number";
+    priceInput.className = "field-control";
+    priceInput.value = item.price || 0;
+    priceInput.min = "0";
+    priceInput.step = "0.01";
+    priceInput.style.cssText = "width: 95px; font-size: 13px; text-align: right;";
+    priceInput.onchange = function() {
+      item.price = parseFloat(priceInput.value) || 0;
+      totalCell.textContent = formatMoney((item.qty || 0) * (item.price || 0));
+      recalcEditDocTotals();
+    };
+    tdPrice.appendChild(priceInput);
+
+    var tdTotal = document.createElement("td");
+    tdTotal.style.cssText = "padding: 6px 8px; text-align: right; font-weight: 500;";
+    var totalCell = tdTotal;
+    tdTotal.textContent = formatMoney((item.qty || 0) * (item.price || 0));
+
+    var tdActions = document.createElement("td");
+    tdActions.style.padding = "4px";
+    var btnRemove = document.createElement("button");
+    btnRemove.type = "button";
+    btnRemove.className = "icon-button";
+    btnRemove.textContent = "✕";
+    btnRemove.style.cssText = "padding: 4px 8px; color: #ef4444;";
+    btnRemove.onclick = function() { removeEditDocItem(item._editId); };
+    tdActions.appendChild(btnRemove);
+
+    tr.appendChild(tdNo);
+    tr.appendChild(tdName);
+    tr.appendChild(tdQty);
+    tr.appendChild(tdUnit);
+    tr.appendChild(tdPrice);
+    tr.appendChild(tdTotal);
+    tr.appendChild(tdActions);
+    tbody.appendChild(tr);
+  });
+}
+
+function addEditDocItem() {
+  editDocItems.push({
+    _editId: editDocNextId++,
+    name: "",
+    qty: 1,
+    unit: "",
+    price: 0,
+    discount: 0,
+    discountType: "amount"
+  });
+  renderEditDocItems();
+}
+
+function removeEditDocItem(editId) {
+  editDocItems = editDocItems.filter(function(i) { return i._editId !== editId; });
+  renderEditDocItems();
+  recalcEditDocTotals();
+}
+
+function recalcEditDocTotals() {
+  var subtotal = 0;
+  editDocItems.forEach(function(item) {
+    subtotal += (item.qty || 0) * (item.price || 0);
+  });
+
+  var json = editDocOriginalJson;
+  var afterDiscount = subtotal;
+  if (json.discountEnabled) {
+    var disc = 0;
+    if (json.discountType === "percent") {
+      disc = subtotal * ((json.discountValue || 0) / 100);
+    } else {
+      disc = json.discountValue || 0;
+    }
+    afterDiscount = Math.max(0, subtotal - disc);
+  }
+
+  var vatAmount = 0;
+  if (json.vatEnabled) {
+    var vatRate = json.vatRate || 7;
+    if (json.vatInclusive) {
+      vatAmount = afterDiscount - (afterDiscount / (1 + vatRate / 100));
+    } else {
+      vatAmount = afterDiscount * vatRate / 100;
+    }
+  }
+
+  var whtAmount = 0;
+  if (json.whtEnabled) {
+    var whtBase = afterDiscount;
+    if (json.vatEnabled && json.vatInclusive) {
+      whtBase = afterDiscount / (1 + (json.vatRate || 7) / 100);
+    }
+    whtAmount = whtBase * ((json.whtRate || 3) / 100);
+  }
+
+  var customFee = 0;
+  if (json.customFeeEnabled) {
+    customFee = json.customFeeAmount || 0;
+  }
+
+  var grandTotal = json.vatInclusive ? afterDiscount - whtAmount + customFee : afterDiscount + vatAmount - whtAmount + customFee;
+
+  var el = document.getElementById("editDocGrandTotal");
+  if (el) el.value = formatMoney(Math.round(grandTotal * 100) / 100);
+}
+
+function initDocHistoryPage() {
+  var typeFilter = document.getElementById("docHistoryTypeFilter");
+  var customerFilter = document.getElementById("docHistoryCustomerFilter");
+  var searchInput = document.getElementById("docHistorySearch");
+  var refreshBtn = document.getElementById("btnRefreshDocHistory");
+  
+  if (typeFilter) {
+    typeFilter.onchange = function() {
+      docHistoryState.typeFilter = typeFilter.value;
+      filterAndRenderDocHistory();
+    };
+  }
+  
+  if (customerFilter) {
+    var customerFilterTimeout = null;
+    customerFilter.oninput = function() {
+      clearTimeout(customerFilterTimeout);
+      customerFilterTimeout = setTimeout(function() {
+        docHistoryState.customerFilter = customerFilter.value.toLowerCase().trim();
+        filterAndRenderDocHistory();
+      }, 300);
+    };
+  }
+  
+  if (searchInput) {
+    var searchTimeout = null;
+    searchInput.oninput = function() {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(function() {
+        docHistoryState.searchText = searchInput.value.toLowerCase().trim();
+        filterAndRenderDocHistory();
+      }, 300);
+    };
+  }
+  
+  if (refreshBtn) {
+    refreshBtn.onclick = loadDocHistory;
+  }
+
+  initEditDocModalEvents();
+  initDocHistoryCheckboxes();
+}
+
+function loadDocHistory() {
+  console.log("[loadDocHistory] START, sheetsId:", state.sheetsId ? "SET" : "NOT SET", "companyId:", state.companyId);
+  var tbody = document.getElementById("docHistoryTbody");
+  if (!state.sheetsId) {
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="7" class="muted" style="text-align: center; padding: 40px;">กรุณาเชื่อมต่อ Google Sheets ก่อน (หน้าตั้งค่า)</td></tr>';
+    }
+    return;
+  }
+
+  // Use state.documents from refreshAll (already loaded)
+  if (state.documents && state.documents.length > 0) {
+    console.log("[loadDocHistory] Using state.documents:", state.documents.length, "docs");
+    docHistoryState.documents = state.documents;
+    filterAndRenderDocHistory();
+    return;
+  }
+
+  // Fallback: fetch from server
+  if (tbody) {
+    tbody.innerHTML = '<tr><td colspan="7" class="muted" style="text-align: center; padding: 40px;">กำลังโหลด...</td></tr>';
+  }
+  var companyId = state.companyId || null;
+  console.log("[loadDocHistory] Fallback: calling server with companyId:", companyId);
+
+  runServer("listDocumentsForHistoryApi", companyId)
+    .then(function(docs) {
+      console.log("[loadDocHistory] Server returned", docs ? docs.length : 0, "documents");
+      docHistoryState.documents = (docs || []).map(function(d) {
+        if (typeof d.json === "string") { try { d.json = JSON.parse(d.json); } catch(e) { d.json = {}; } }
+        if (!d.json) d.json = {};
+        return d;
+      });
+      filterAndRenderDocHistory();
+    })
+    .catch(function(error) {
+      console.error("[loadDocHistory] Server error:", error);
+      if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="7" class="muted" style="text-align: center; padding: 40px; color: #ef4444;">เกิดข้อผิดพลาด: ' + (error.message || error) + '</td></tr>';
+      }
+    });
+}
+
+function filterAndRenderDocHistory() {
+  var docs = docHistoryState.documents || [];
+  var typeFilter = docHistoryState.typeFilter;
+  var customerFilter = docHistoryState.customerFilter;
+  var searchText = docHistoryState.searchText;
+  
+  var filtered = docs.filter(function(doc) {
+    var customerName = "";
+    if (doc.json && doc.json.customerName) {
+      customerName = doc.json.customerName.toLowerCase();
+    }
+
+    // Type filter
+    if (typeFilter && (doc.docType || doc.type) !== typeFilter) {
+      return false;
+    }
+
+    // Customer filter
+    if (customerFilter && customerName.indexOf(customerFilter) === -1) {
+      return false;
+    }
+    
+    // Search filter
+    if (searchText) {
+      var docNo = (doc.docNo || "").toLowerCase();
+      if (docNo.indexOf(searchText) === -1 && customerName.indexOf(searchText) === -1) {
+        return false;
+      }
+    }
+    
+    return true;
+  });
+  
+  docHistoryState.filteredDocs = filtered;
+  renderDocHistoryTable(filtered);
+}
+
+function renderDocHistoryTable(docs) {
+  var tbody = document.getElementById("docHistoryTbody");
+  if (!tbody) return;
+  
+  if (!docs || !docs.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="muted" style="text-align: center; padding: 40px;">ไม่พบเอกสาร</td></tr>';
+    updateDocHistoryBatchBar();
+    return;
+  }
+  
+  var html = "";
+  docs.forEach(function(doc) {
+    var docType = doc.docType || doc.type || "QUO";
+    var docId = doc.docId || doc.entityId;
+    var config = DOC_CONFIG[docType] || DOC_CONFIG.QUO;
+    var json = doc.json || {};
+    var grandTotal = json.grandTotal || doc.grandTotal || 0;
+    var customerName = json.customerName || "-";
+    
+    html += '<tr data-doc-id="' + docId + '">';
+    html += '<td><input type="checkbox" class="doc-history-check" data-doc-id="' + docId + '" /></td>';
+    html += '<td><strong>' + (doc.docNo || "-") + '</strong></td>';
+    html += '<td><span class="badge doc-type-badge" style="background: ' + config.color + '20; color: ' + config.color + ';">' + config.nameTH + '</span></td>';
+    html += '<td>' + customerName + '</td>';
+    html += '<td>' + formatDateThai(doc.docDate || doc.createdAt) + '</td>';
+    html += '<td style="font-weight: 600;">' + formatMoney(grandTotal) + '</td>';
+    html += '<td>';
+    html += '<div style="display: flex; gap: 4px;">';
+    html += '<button class="icon-button btn-view-doc" data-id="' + docId + '" title="ดู"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>';
+    html += '<button class="icon-button btn-edit-doc" data-id="' + docId + '" title="แก้ไข"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>';
+    html += '<button class="icon-button btn-delete-doc" data-id="' + docId + '" title="ลบ"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>';
+    html += '</div>';
+    html += '</td>';
+    html += '</tr>';
+  });
+  
+  tbody.innerHTML = html;
+  
+  // Attach event handlers
+  tbody.querySelectorAll(".btn-view-doc").forEach(function(btn) {
+    btn.onclick = function() { viewDocumentFromHistory(btn.dataset.id); };
+  });
+  tbody.querySelectorAll(".btn-edit-doc").forEach(function(btn) {
+    btn.onclick = function() { editDocumentFromHistory(btn.dataset.id); };
+  });
+  tbody.querySelectorAll(".btn-delete-doc").forEach(function(btn) {
+    btn.onclick = function() { deleteDocumentFromHistory(btn.dataset.id); };
+  });
+
+  // Attach checkbox change handlers
+  tbody.querySelectorAll(".doc-history-check").forEach(function(cb) {
+    cb.onchange = function() { updateDocHistoryBatchBar(); };
+  });
+
+  // Reset select-all
+  var selectAll = document.getElementById("selectAllDocHistory");
+  if (selectAll) selectAll.checked = false;
+  updateDocHistoryBatchBar();
+}
+
+function viewDocumentFromHistory(docId) {
+  var doc = docHistoryState.documents.find(function(d) { 
+    return (d.docId || d.entityId) === docId; 
+  });
+  if (!doc) {
+    showToast("ไม่พบเอกสาร", { type: "warning" });
+    return;
+  }
+  
+  // Ensure json is a parsed object (may arrive as string from GAS)
+  if (typeof doc.json === "string") {
+    try { doc.json = JSON.parse(doc.json); } catch(e) { doc.json = {}; }
+  }
+  
+  openPreviewFromDoc(doc);
+}
+
+function editDocumentFromHistory(docId) {
+  var doc = docHistoryState.documents.find(function(d) {
+    return (d.docId || d.entityId) === docId; 
+  });
+  if (!doc) {
+    showToast("ไม่พบเอกสาร", { type: "warning" });
+    return;
+  }
+  
+  // Ensure json is a parsed object
+  if (typeof doc.json === "string") {
+    try { doc.json = JSON.parse(doc.json); } catch(e) { doc.json = {}; }
+  }
+  var json = doc.json || {};
+  var docType = doc.docType || doc.type || "QUO";
+  var config = DOC_CONFIG[docType] || DOC_CONFIG.QUO;
+  
+  // Fill the edit modal
+  document.getElementById("editDocId").value = doc.docId || doc.entityId || "";
+  document.getElementById("editDocType").value = docType;
+  document.getElementById("editDocNo").value = doc.docNo || "";
+  document.getElementById("editDocDate").value = (doc.docDate || "").substring(0, 10);
+  document.getElementById("editDocDueDate").value = (doc.dueDate || "").substring(0, 10);
+  document.getElementById("editDocCustomerName").value = json.customerName || "";
+  document.getElementById("editDocCustomerTaxId").value = json.customerTaxId || "";
+  document.getElementById("editDocCustomerAddress").value = json.customerAddress || "";
+  document.getElementById("editDocCustomerPhone").value = json.customerPhone || "";
+  document.getElementById("editDocCustomerEmail").value = json.customerEmail || "";
+  document.getElementById("editDocNote").value = json.note || "";
+  document.getElementById("editDocGrandTotal").value = formatMoney(doc.grandTotal || json.grandTotal || 0);
+  document.getElementById("editDocModalTitle").textContent = "แก้ไข " + config.nameTH + " " + (doc.docNo || "");
+
+  // Load terms data
+  var editPaymentTermsEl = document.getElementById("editDocPaymentTerms");
+  var editPaymentCustomEl = document.getElementById("editDocPaymentTermsCustom");
+  var editTermsTextEl = document.getElementById("editDocTermsText");
+  if (editPaymentTermsEl) {
+    editPaymentTermsEl.value = json.paymentTerms || "";
+    if (editPaymentCustomEl) {
+      editPaymentCustomEl.style.display = (json.paymentTerms === "custom") ? "block" : "none";
+      editPaymentCustomEl.value = json.paymentTermsCustom || "";
+    }
+  }
+  if (editTermsTextEl) editTermsTextEl.value = json.termsText || doc.terms || "";
+
+  // Load items into editable state
+  editDocOriginalJson = json;
+  editDocItems = [];
+  editDocNextId = 1;
+  var items = json.items || [];
+  items.forEach(function(item) {
+    editDocItems.push({
+      _editId: editDocNextId++,
+      productId: item.productId || "",
+      name: item.name || "",
+      qty: Number(item.qty) || 0,
+      unit: item.unit || "",
+      price: Number(item.price) || 0,
+      discount: Number(item.discount) || 0,
+      discountType: item.discountType || "amount",
+      details: item.details || ""
+    });
+  });
+  renderEditDocItems();
+
+  // Show modal
+  var modal = document.getElementById("editDocModal");
+  if (modal) modal.style.display = "flex";
+}
+
+function closeEditDocModal() {
+  var modal = document.getElementById("editDocModal");
+  if (modal) modal.style.display = "none";
+}
+
+function saveEditDocument() {
+  var docId = document.getElementById("editDocId").value;
+  if (!docId) return;
+
+  var doc = docHistoryState.documents.find(function(d) {
+    return (d.docId || d.entityId) === docId;
+  });
+  if (!doc) return;
+
+  if (typeof doc.json === "string") {
+    try { doc.json = JSON.parse(doc.json); } catch(e) { doc.json = {}; }
+  }
+  var json = doc.json || {};
+
+  // Collect edited items (strip internal _editId)
+  var updatedItems = editDocItems.map(function(item) {
+    return {
+      productId: item.productId || "",
+      name: item.name || "",
+      qty: item.qty || 0,
+      unit: item.unit || "",
+      price: item.price || 0,
+      discount: item.discount || 0,
+      discountType: item.discountType || "amount",
+      details: item.details || ""
+    };
+  });
+
+  // Recalculate totals from edited items
+  var newSubtotal = 0;
+  updatedItems.forEach(function(item) {
+    newSubtotal += (item.qty || 0) * (item.price || 0);
+  });
+
+  var afterDiscount = newSubtotal;
+  if (json.discountEnabled) {
+    var disc = 0;
+    if (json.discountType === "percent") {
+      disc = newSubtotal * ((json.discountValue || 0) / 100);
+    } else {
+      disc = json.discountValue || 0;
+    }
+    afterDiscount = Math.max(0, newSubtotal - disc);
+  }
+
+  var newVatAmount = 0;
+  if (json.vatEnabled) {
+    var vatRate = json.vatRate || 7;
+    if (json.vatInclusive) {
+      newVatAmount = afterDiscount - (afterDiscount / (1 + vatRate / 100));
+    } else {
+      newVatAmount = afterDiscount * vatRate / 100;
+    }
+  }
+
+  var newWhtAmount = 0;
+  if (json.whtEnabled) {
+    var whtBase = afterDiscount;
+    if (json.vatEnabled && json.vatInclusive) {
+      whtBase = afterDiscount / (1 + (json.vatRate || 7) / 100);
+    }
+    newWhtAmount = whtBase * ((json.whtRate || 3) / 100);
+  }
+
+  var customFee = 0;
+  if (json.customFeeEnabled) {
+    customFee = json.customFeeAmount || 0;
+  }
+
+  var newGrandTotal = json.vatInclusive ? afterDiscount - newWhtAmount + customFee : afterDiscount + newVatAmount - newWhtAmount + customFee;
+  newGrandTotal = Math.round(newGrandTotal * 100) / 100;
+
+  // Build updated payload
+  var payload = {
+    docId: docId,
+    docDate: document.getElementById("editDocDate").value,
+    dueDate: document.getElementById("editDocDueDate").value,
+    paymentStatus: doc.paymentStatus || "UNPAID",
+    notes: document.getElementById("editDocNote").value,
+    grandTotal: newGrandTotal,
+    subtotal: Math.round(newSubtotal * 100) / 100,
+    vatAmount: Math.round(newVatAmount * 100) / 100,
+    whtAmount: Math.round(newWhtAmount * 100) / 100,
+    json: JSON.stringify({
+      customerName: document.getElementById("editDocCustomerName").value,
+      customerTaxId: document.getElementById("editDocCustomerTaxId").value,
+      customerAddress: document.getElementById("editDocCustomerAddress").value,
+      customerPhone: document.getElementById("editDocCustomerPhone").value,
+      customerEmail: document.getElementById("editDocCustomerEmail").value,
+      note: document.getElementById("editDocNote").value,
+      items: updatedItems,
+      subtotal: Math.round(newSubtotal * 100) / 100,
+      grandTotal: newGrandTotal,
+      afterDiscount: Math.round(afterDiscount * 100) / 100,
+      vatAmount: Math.round(newVatAmount * 100) / 100,
+      whtAmount: Math.round(newWhtAmount * 100) / 100,
+      itemDiscount: json.itemDiscount || 0,
+      totalDiscount: json.discountEnabled ? Math.round((newSubtotal - afterDiscount) * 100) / 100 : 0,
+      paymentTerms: (document.getElementById("editDocPaymentTerms") || {}).value || json.paymentTerms || "",
+      paymentTermsCustom: (document.getElementById("editDocPaymentTermsCustom") || {}).value || "",
+      paymentTermsLabel: (function() {
+        var sel = document.getElementById("editDocPaymentTerms");
+        if (!sel || !sel.value) return "";
+        if (sel.value === "custom") return (document.getElementById("editDocPaymentTermsCustom") || {}).value || "";
+        return sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent : sel.value;
+      })(),
+      showPaymentTerms: !!((document.getElementById("editDocPaymentTerms") || {}).value),
+      termsText: (document.getElementById("editDocTermsText") || {}).value || "",
+      showTermsAndConditions: !!((document.getElementById("editDocTermsText") || {}).value),
+      // Preserve existing json fields
+      itemMode: json.itemMode || "product",
+      discountEnabled: json.discountEnabled || false,
+      discountType: json.discountType || "percent",
+      discountValue: json.discountValue || 0,
+      vatEnabled: json.vatEnabled || false,
+      vatRate: json.vatRate || 7,
+      vatInclusive: json.vatInclusive || false,
+      whtEnabled: json.whtEnabled || false,
+      whtRate: json.whtRate || 3,
+      customFeeEnabled: json.customFeeEnabled || false,
+      customFeeName: json.customFeeName || "",
+      customFeeAmount: json.customFeeAmount || 0,
+      signatureEnabled: json.signatureEnabled !== undefined ? json.signatureEnabled : true,
+      signatureName: json.signatureName || "",
+      signatureImage: json.signatureImage || "",
+      signatureDate: json.signatureDate || "",
+      stampEnabled: json.stampEnabled || false,
+      stampSource: json.stampSource || "",
+      stampImage: json.stampImage || "",
+      docLang: json.docLang || "th",
+      showDetail: json.showDetail !== undefined ? json.showDetail : true,
+      salespersonId: json.salespersonId || "",
+      salespersonName: json.salespersonName || "",
+      contactPerson: json.contactPerson || ""
+    })
+  };
+
+  var btn = document.getElementById("btnSaveEditDoc");
+  if (btn) { btn.disabled = true; btn.textContent = "กำลังบันทึก..."; }
+
+  runServer("updateDocumentApi", docId, payload)
+    .then(function() {
+      closeEditDocModal();
+      if (btn) { btn.disabled = false; btn.textContent = "บันทึก"; }
+      // Refresh data
+      return refreshAll();
+    })
+    .then(function() {
+      loadDocHistory();
+    })
+    .catch(function(error) {
+      if (btn) { btn.disabled = false; btn.textContent = "บันทึก"; }
+      showToast((error.message || error), { type: "error" });
+    });
+}
+
+function initEditDocModalEvents() {
+  var closeBtn = document.getElementById("closeEditDocModal");
+  var cancelBtn = document.getElementById("btnCancelEditDoc");
+  var saveBtn = document.getElementById("btnSaveEditDoc");
+  var addItemBtn = document.getElementById("btnAddEditDocItem");
+  if (closeBtn) closeBtn.onclick = closeEditDocModal;
+  if (cancelBtn) cancelBtn.onclick = closeEditDocModal;
+  if (saveBtn) saveBtn.onclick = saveEditDocument;
+  if (addItemBtn) addItemBtn.onclick = addEditDocItem;
+
+  var editPaymentTermsSel = document.getElementById("editDocPaymentTerms");
+  if (editPaymentTermsSel) {
+    editPaymentTermsSel.onchange = function() {
+      var customEl = document.getElementById("editDocPaymentTermsCustom");
+      if (customEl) customEl.style.display = (editPaymentTermsSel.value === "custom") ? "block" : "none";
+    };
+  }
+}
+
+function getSelectedDocIds() {
+  var checked = document.querySelectorAll(".doc-history-check:checked");
+  var ids = [];
+  checked.forEach(function(cb) { ids.push(cb.dataset.docId); });
+  return ids;
+}
+
+function updateDocHistoryBatchBar() {
+  var bar = document.getElementById("docHistoryBatchBar");
+  var countEl = document.getElementById("docHistorySelectedCount");
+  if (!bar) return;
+  var ids = getSelectedDocIds();
+  if (ids.length > 0) {
+    bar.style.display = "flex";
+    if (countEl) countEl.textContent = ids.length + " รายการที่เลือก";
+  } else {
+    bar.style.display = "none";
+  }
+}
+
+function initDocHistoryCheckboxes() {
+  var selectAll = document.getElementById("selectAllDocHistory");
+  if (selectAll) {
+    selectAll.onchange = function() {
+      var checked = selectAll.checked;
+      document.querySelectorAll(".doc-history-check").forEach(function(cb) { cb.checked = checked; });
+      updateDocHistoryBatchBar();
+    };
+  }
+
+  var btnBatchPrint = document.getElementById("btnBatchPrintDocs");
+  if (btnBatchPrint) btnBatchPrint.onclick = batchPrintDocs;
+
+  var btnBatchDownload = document.getElementById("btnBatchDownloadDocs");
+  if (btnBatchDownload) btnBatchDownload.onclick = batchDownloadDocs;
+}
+
+function getDocsByIds(ids) {
+  return (docHistoryState.documents || []).filter(function(d) {
+    return ids.indexOf(d.docId || d.entityId) !== -1;
+  });
+}
+
+function buildBatchPagesHtml(docs, choice) {
+  var pagesHtml = "";
+  docs.forEach(function(doc, idx) {
+    if (typeof doc.json === "string") { try { doc.json = JSON.parse(doc.json); } catch(e) { doc.json = {}; } }
+    var pageHtml = generatePreviewFromDoc(doc);
+    var tmp = document.createElement("div");
+    tmp.innerHTML = pageHtml;
+    
+    // Update all badges in this document
+    var badges = tmp.querySelectorAll(".doc-badge");
+    for (var i = 0; i < badges.length; i++) {
+      if (choice && choice.choice === "original") {
+        badges[i].innerHTML = '<span style="background: #dbeafe; color: #1e40af;">ต้นฉบับ</span>';
+      } else {
+        badges[i].innerHTML = '<span>สำเนา</span>';
+      }
+    }
+    
+    var isLast = (idx === docs.length - 1);
+    var wrapStyle = isLast ? '' : 'page-break-after: always;';
+    pagesHtml += '<div style="' + wrapStyle + '">' + tmp.innerHTML + '</div>';
+  });
+  return pagesHtml;
+}
+
+function batchPrintDocs() {
+  var ids = getSelectedDocIds();
+  if (!ids.length) { showToast("กรุณาเลือกเอกสารก่อน", { type: "warning" }); return; }
+  var docs = getDocsByIds(ids);
+  if (!docs.length) return;
+
+  showDocTypeChoice().then(function(choice) {
+    if (!choice) return;
+    var pagesHtml = buildBatchPagesHtml(docs, choice);
+    var title = "พิมพ์เอกสาร (" + docs.length + " รายการ)";
+    var html = buildDocHtml(pagesHtml, title);
+    openPrintWindow(html, true, true);
+  });
+}
+
+function batchDownloadDocs() {
+  var ids = getSelectedDocIds();
+  if (!ids.length) { showToast("กรุณาเลือกเอกสารก่อน", { type: "warning" }); return; }
+  var docs = getDocsByIds(ids);
+  if (!docs.length) return;
+
+  showDocTypeChoice().then(function(choice) {
+    if (!choice) return;
+    var pagesHtml = buildBatchPagesHtml(docs, choice);
+    var firstDocNo = docs[0].docNo || "document";
+    var filename = docs.length === 1 ? firstDocNo + ".pdf" : "documents_" + docs.length + ".pdf";
+    var html = buildDocHtml(pagesHtml, filename);
+
+    if (typeof html2pdf !== "undefined") {
+      generatePdfFromHtml(html, filename);
+    } else {
+      openPrintWindow(html, true, false);
+    }
+  });
+}
+
+function navigateToDocHistoryAndSelect(docIdOrIds) {
+  setView("doc-history");
+  // Reload doc history data then auto-select the document(s)
+  docHistoryState.documents = state.documents || [];
+  filterAndRenderDocHistory();
+
+  var ids = Array.isArray(docIdOrIds) ? docIdOrIds : [docIdOrIds];
+  // Auto-check the new document(s) after render
+  setTimeout(function() {
+    var firstRow = null;
+    for (var i = 0; i < ids.length; i++) {
+      var cb = document.querySelector('.doc-history-check[data-doc-id="' + ids[i] + '"]');
+      if (cb) {
+        cb.checked = true;
+        if (!firstRow) firstRow = cb.closest("tr");
+      }
+    }
+    updateDocHistoryBatchBar();
+    if (firstRow) {
+      firstRow.style.scrollMarginTop = "80px";
+      firstRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, 300);
+}
+
+function deleteDocumentFromHistory(docId) {
+  showConfirm({
+    title: "ลบเอกสาร",
+    message: "ต้องการลบเอกสารนี้หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้",
+    type: "danger",
+    confirmText: "ลบเอกสาร"
+  }).then(function(confirmed) {
+    if (!confirmed) return;
+    runServer("deleteDocumentApi", docId)
+      .then(function() {
+        showToast("ลบเอกสารเรียบร้อยแล้ว", { type: "success" });
+        return refreshAll();
+      })
+      .then(function() {
+        loadDocHistory();
+        if (typeof loadPayments === "function") loadPayments();
+      })
+      .catch(function(error) {
+        showToast((error.message || error), { type: "error" });
+      });
+  });
+}
+</script>

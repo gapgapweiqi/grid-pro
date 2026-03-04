@@ -1,0 +1,499 @@
+<script>
+function getCurrencySymbol(currencyCode) {
+  currencyCode = currencyCode || state.settings["defaults.currency"] || state.defaults.currency || "THB";
+  try {
+    var parts = new Intl.NumberFormat("en", { style: "currency", currency: currencyCode }).formatToParts(0);
+    var sym = parts.find(function(p) { return p.type === "currency"; });
+    return sym ? sym.value : currencyCode;
+  } catch(e) {
+    return currencyCode;
+  }
+}
+
+function formatMoney(value) {
+  var currency = state.settings["defaults.currency"] || state.defaults.currency || "THB";
+  var number = Number(value || 0);
+  try {
+    return new Intl.NumberFormat("th-TH", {
+      style: "currency",
+      currency: currency,
+      maximumFractionDigits: 2
+    }).format(number);
+  } catch (error) {
+    return getCurrencySymbol(currency) + number.toFixed(2);
+  }
+}
+
+function formatCompactMoney(value) {
+  var currency = state.settings["defaults.currency"] || state.defaults.currency || "THB";
+  var number = Number(value || 0);
+  try {
+    var parts = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currency,
+      notation: "compact",
+      compactDisplay: "short",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    }).formatToParts(number);
+    
+    // Custom format: replace currency symbol if needed, or just let Intl handle it
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currency,
+      notation: "compact",
+      compactDisplay: "short",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    }).format(number);
+  } catch(e) {
+    // Fallback if Intl.NumberFormat with compact notation is not fully supported
+    if (Math.abs(number) >= 1e6) {
+      return getCurrencySymbol(currency) + (number / 1e6).toFixed(1) + "M";
+    } else if (Math.abs(number) >= 1e3) {
+      return getCurrencySymbol(currency) + (number / 1e3).toFixed(1) + "K";
+    }
+    return formatMoney(number);
+  }
+}
+
+function showError(err) {
+  var message = err && err.message ? err.message : String(err || "Unknown error");
+  showToast(message, { type: "error" });
+}
+
+var _loaderCount = 0;
+
+function showGlobalLoader(msg) {
+  _loaderCount++;
+  var el = document.getElementById("globalLoader");
+  if (!el) return;
+  if (msg) {
+    var lbl = el.querySelector(".loader-label");
+    if (lbl) lbl.textContent = msg;
+  }
+  el.classList.add("active");
+}
+
+function hideGlobalLoader() {
+  _loaderCount = Math.max(0, _loaderCount - 1);
+  if (_loaderCount > 0) return;
+  var el = document.getElementById("globalLoader");
+  if (!el) return;
+  el.classList.remove("active");
+  var lbl = el.querySelector(".loader-label");
+  if (lbl) lbl.textContent = "\u0e01\u0e33\u0e25\u0e31\u0e07\u0e14\u0e33\u0e40\u0e19\u0e34\u0e19\u0e01\u0e32\u0e23...";
+}
+
+function runServer(functionName) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  showGlobalLoader();
+  return new Promise(function(resolve, reject) {
+    var runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+    var serverFunc = runner ? runner[functionName] : null;
+    if (typeof serverFunc !== "function") {
+      hideGlobalLoader();
+      reject(new Error("Unknown server function: " + functionName));
+      return;
+    }
+    serverFunc.apply(runner, args);
+  }).then(function(result) {
+    hideGlobalLoader();
+    return result;
+  }).catch(function(err) {
+    hideGlobalLoader();
+    throw err;
+  });
+}
+
+function setText(id, text) {
+  var el = document.getElementById(id);
+  if (!el) {
+    return;
+  }
+  el.textContent = text;
+}
+
+function clearElement(el) {
+  while (el.firstChild) {
+    el.removeChild(el.firstChild);
+  }
+}
+
+function ensureCompanySelected() {
+  if (!state.companyId) {
+    showToast("กรุณาเลือกบริษัทก่อน", { type: "warning" });
+    return false;
+  }
+  return true;
+}
+
+function downloadTextFile(filename, content, mimeType) {
+  var bom = (filename && filename.endsWith(".csv")) ? "\uFEFF" : "";
+  var blob = new Blob([bom + content], { type: mimeType || "text/plain;charset=utf-8" });
+  var url = URL.createObjectURL(blob);
+  var link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  setTimeout(function() {
+    URL.revokeObjectURL(url);
+    link.remove();
+  }, 0);
+}
+
+function resizeImageBase64(base64Str, maxWidth, maxHeight, callback) {
+  if (!base64Str || base64Str.indexOf("data:image") !== 0) {
+    callback(base64Str);
+    return;
+  }
+  var img = new Image();
+  img.onload = function() {
+    var w = img.width;
+    var h = img.height;
+    if (w <= maxWidth && h <= maxHeight) {
+      // already small enough, but let's compress to JPEG to save space anyway if it's not a tiny PNG
+      if (base64Str.length < 50000 && base64Str.indexOf("image/png") !== -1) {
+        callback(base64Str);
+        return;
+      }
+    }
+    var ratio = Math.min(maxWidth / w, Math.min(maxHeight / h, 1));
+    var canvas = document.createElement("canvas");
+    canvas.width = w * ratio;
+    canvas.height = h * ratio;
+    var ctx = canvas.getContext("2d");
+    
+    // Fill white background for transparent PNGs converted to JPEG
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    // Compress as JPEG 70% quality to save space
+    callback(canvas.toDataURL("image/jpeg", 0.7)); 
+  };
+  img.onerror = function() { callback(base64Str); };
+  img.src = base64Str;
+}
+
+function pickFile(accept) {
+  return new Promise(function(resolve, reject) {
+    var input = document.createElement("input");
+    input.type = "file";
+    input.accept = accept || "*/*";
+    input.addEventListener(
+      "change",
+      function() {
+        var file = input.files && input.files[0];
+        if (!file) {
+          reject(new Error("No file selected"));
+          return;
+        }
+        resolve(file);
+      }
+    );
+    input.click();
+  });
+}
+
+function readFileText(file) {
+  return new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function() { resolve(String(reader.result || "")); };
+    reader.onerror = function() { reject(reader.error || new Error("Failed to read file")); };
+    reader.readAsText(file);
+  });
+}
+
+function exportCsv(entityType) {
+  if (!ensureCompanySelected()) return;
+  runServer("exportCsvApi", entityType, state.companyId)
+    .then(function(result) {
+      if (!result || !result.content) {
+        showToast("ไม่พบข้อมูลสำหรับส่งออก", { type: "warning" });
+        return;
+      }
+      downloadTextFile(result.filename || "export.csv", result.content, "text/csv;charset=utf-8");
+    })
+    .catch(function(error) {
+      showError(error);
+    });
+}
+
+function importCsv(entityType) {
+  if (!ensureCompanySelected()) return;
+  pickFile(".csv,text/csv")
+    .then(function(file) {
+      return readFileText(file);
+    })
+    .then(function(text) {
+      text = text.replace(/^\uFEFF/, "");
+      return runServer("importCsvApi", entityType, state.companyId, text, { mode: "UPSERT" });
+    })
+    .then(function(result) {
+      var errorLines = (result && result.errors ? result.errors : [])
+        .slice(0, 5)
+        .map(function(item) { return "แถว " + item.row + ": " + item.message; })
+        .join("\n");
+      showToast(
+        "นำเข้าแล้ว " + (result.inserted || 0) + " รายการ, อัปเดต " + (result.updated || 0) + " รายการ" +
+        (errorLines ? "<br/>" + errorLines : ""),
+        { type: "success", title: "นำเข้า CSV สำเร็จ" }
+      );
+      return refreshAll();
+    })
+    .catch(function(error) {
+      showError(error);
+    });
+}
+
+function getDocLang(docJson) {
+  if (docJson && docJson.docLang) return docJson.docLang;
+  var el = document.getElementById("docLangSelect");
+  if (el && el.value) return el.value;
+  return state.settings["doc.language"] || "th";
+}
+
+function formatDateThai(dateStr) {
+  if (!dateStr) return "-";
+  var d = new Date(dateStr);
+  if (isNaN(d)) return dateStr;
+  var months = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+  return d.getDate() + " " + months[d.getMonth()] + " " + (d.getFullYear() + 543);
+}
+
+function formatDateEN(dateStr) {
+  if (!dateStr) return "-";
+  var d = new Date(dateStr);
+  if (isNaN(d)) return dateStr;
+  var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return months[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear();
+}
+
+function formatDocDate(dateStr) {
+  return getDocLang() === "th" ? formatDateThai(dateStr) : formatDateEN(dateStr);
+}
+
+function formatTaxId(taxId) {
+  if (!taxId) return "";
+  var digits = taxId.replace(/\D/g, "");
+  if (digits.length === 13) {
+    return digits.replace(/(\d{1})(\d{4})(\d{5})(\d{2})(\d{1})/, "$1 $2 $3 $4 $5");
+  }
+  return taxId;
+}
+
+function formatPhone(phone) {
+  if (!phone) return "";
+  var digits = phone.replace(/\D/g, "");
+  if (digits.length === 9 && digits.startsWith("02")) {
+    return digits.replace(/(\d{2})(\d{3})(\d{4})/, "$1 $2 $3");
+  } else if (digits.length === 10) {
+    return digits.replace(/(\d{3})(\d{3})(\d{4})/, "$1 $2 $3");
+  }
+  return phone;
+}
+
+function numberToThaiText(num) {
+  var digits = ["ศูนย์", "หนึ่ง", "สอง", "สาม", "สี่", "ห้า", "หก", "เจ็ด", "แปด", "เก้า"];
+  var positions = ["", "สิบ", "ร้อย", "พัน", "หมื่น", "แสน", "ล้าน"];
+  
+  if (num === 0) return "ศูนย์บาทถ้วน";
+  
+  num = Math.abs(num);
+  var intPart = Math.floor(num);
+  var decPart = Math.round((num - intPart) * 100);
+  
+  function convertGroup(n) {
+    if (n === 0) return "";
+    var str = "";
+    var nStr = String(n);
+    var len = nStr.length;
+    for (var i = 0; i < len; i++) {
+      var digit = parseInt(nStr[i]);
+      var pos = len - i - 1;
+      if (digit === 0) continue;
+      if (pos === 1 && digit === 1) {
+        str += "สิบ";
+      } else if (pos === 1 && digit === 2) {
+        str += "ยี่สิบ";
+      } else if (pos === 0 && digit === 1 && len > 1) {
+        str += "เอ็ด";
+      } else {
+        str += digits[digit] + positions[pos];
+      }
+    }
+    return str;
+  }
+  
+  var result = "";
+  if (intPart >= 1000000) {
+    result += convertGroup(Math.floor(intPart / 1000000)) + "ล้าน";
+    result += convertGroup(intPart % 1000000);
+  } else {
+    result = convertGroup(intPart);
+  }
+  result += "บาท";
+  
+  if (decPart > 0) {
+    result += convertGroup(decPart) + "สตางค์";
+  } else {
+    result += "ถ้วน";
+  }
+  
+  return result;
+}
+
+function numberToEnglishText(num) {
+  var ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+    "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  var tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+
+  if (num === 0) return "Zero";
+
+  num = Math.abs(num);
+  var intPart = Math.floor(num);
+  var decPart = Math.round((num - intPart) * 100);
+
+  function convertBelow1000(n) {
+    if (n === 0) return "";
+    if (n < 20) return ones[n];
+    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? "-" + ones[n % 10] : "");
+    return ones[Math.floor(n / 100)] + " Hundred" + (n % 100 ? " " + convertBelow1000(n % 100) : "");
+  }
+
+  function convert(n) {
+    if (n === 0) return "";
+    if (n >= 1000000) return convert(Math.floor(n / 1000000)) + " Million " + convert(n % 1000000);
+    if (n >= 1000) return convert(Math.floor(n / 1000)) + " Thousand " + convert(n % 1000);
+    return convertBelow1000(n);
+  }
+
+  var currency = state.settings["defaults.currency"] || state.defaults.currency || "THB";
+  var currName = currency === "THB" ? "Baht" : currency === "USD" ? "Dollars" : currency === "EUR" ? "Euros" : currency === "GBP" ? "Pounds" : currency;
+  var centsName = currency === "THB" ? "Satang" : "Cents";
+
+  var result = convert(intPart).trim() + " " + currName;
+  if (decPart > 0) {
+    result += " and " + convert(decPart).trim() + " " + centsName;
+  } else {
+    result += " Only";
+  }
+  return result;
+}
+
+function numberToAmountText(num) {
+  var lang = getDocLang();
+  if (lang === "en") return numberToEnglishText(num);
+  return numberToThaiText(num);
+}
+
+function getElValue(id) {
+  var el = document.getElementById(id);
+  return el ? el.value : "";
+}
+
+function getElText(id) {
+  var el = document.getElementById(id);
+  return el ? el.textContent : "";
+}
+
+function getElChecked(id) {
+  var el = document.getElementById(id);
+  return el ? el.checked : false;
+}
+
+function getSelectText(id) {
+  var el = document.getElementById(id);
+  if (!el || !el.options || el.selectedIndex < 0) return "";
+  return el.options[el.selectedIndex].textContent || "";
+}
+
+// ===== Custom Toast Notification =====
+var TOAST_ICONS = {
+  success: "✅",
+  error: "❌",
+  warning: "⚠️",
+  info: "ℹ️"
+};
+
+function getToastContainer() {
+  var container = document.getElementById("toastContainer");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "toastContainer";
+    container.className = "toast-container";
+    document.body.appendChild(container);
+  }
+  return container;
+}
+
+function showToast(message, options) {
+  options = options || {};
+  var type = options.type || "success";
+  var title = options.title || (type === "success" ? "สำเร็จ" : type === "error" ? "ข้อผิดพลาด" : type === "warning" ? "คำเตือน" : "แจ้งเตือน");
+  var duration = options.duration !== undefined ? options.duration : 4000;
+
+  var container = getToastContainer();
+  var toast = document.createElement("div");
+  toast.className = "toast toast-" + type;
+
+  toast.innerHTML = '<div class="toast-icon">' + (TOAST_ICONS[type] || "ℹ️") + '</div>' +
+    '<div class="toast-body"><div class="toast-title">' + title + '</div><div class="toast-message">' + message + '</div></div>' +
+    '<button class="toast-close">&times;</button>';
+
+  toast.querySelector(".toast-close").onclick = function() { dismissToast(toast); };
+  container.appendChild(toast);
+
+  if (duration > 0) {
+    setTimeout(function() { dismissToast(toast); }, duration);
+  }
+  return toast;
+}
+
+function dismissToast(toast) {
+  if (!toast || toast._dismissed) return;
+  toast._dismissed = true;
+  toast.classList.add("toast-exit");
+  setTimeout(function() {
+    if (toast.parentNode) toast.parentNode.removeChild(toast);
+  }, 350);
+}
+
+// ===== Custom Confirm Modal =====
+function showConfirm(options) {
+  options = options || {};
+  var title = options.title || "ยืนยัน";
+  var message = options.message || "";
+  var type = options.type || "danger";
+  var confirmText = options.confirmText || "ยืนยัน";
+  var cancelText = options.cancelText || "ยกเลิก";
+
+  var iconMap = { danger: "🗑️", warning: "⚠️", info: "❓" };
+
+  return new Promise(function(resolve) {
+    var overlay = document.createElement("div");
+    overlay.className = "confirm-overlay";
+    overlay.innerHTML = '<div class="confirm-card">' +
+      '<div class="confirm-icon confirm-' + type + '">' + (iconMap[type] || "❓") + '</div>' +
+      '<div class="confirm-title">' + title + '</div>' +
+      '<div class="confirm-message">' + message + '</div>' +
+      '<div class="confirm-actions">' +
+        '<button class="confirm-btn-cancel">' + cancelText + '</button>' +
+        '<button class="confirm-btn-' + (type === "danger" ? "danger" : "ok") + '">' + confirmText + '</button>' +
+      '</div></div>';
+
+    function close(result) {
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      resolve(result);
+    }
+
+    overlay.querySelector(".confirm-btn-cancel").onclick = function() { close(false); };
+    overlay.querySelector(".confirm-btn-" + (type === "danger" ? "danger" : "ok")).onclick = function() { close(true); };
+    overlay.addEventListener("click", function(e) { if (e.target === overlay) close(false); });
+
+    document.body.appendChild(overlay);
+  });
+}
+</script>

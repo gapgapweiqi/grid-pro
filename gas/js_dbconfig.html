@@ -1,0 +1,164 @@
+<script>
+(function() {
+  function initDatabaseSettings() {
+    var input = document.getElementById('sheetsIdInput');
+    var btn = document.getElementById('btnConnectSheets');
+    var statusEl = document.getElementById('sheetsStatus');
+    var inputRow = input ? input.closest('.settings-row') : null;
+    var hintEl = input ? input.parentElement.querySelector('.muted') : null;
+
+    var conn = state.sheetsConnection || {};
+
+    // If already connected with own sheet (container-bound or manually set)
+    if (conn.isOwnSheet || conn.isContainerBound) {
+      // Hide the input field — leave it blank
+      input.value = '';
+      input.type = 'hidden';
+      if (hintEl) hintEl.style.display = 'none';
+      if (btn) btn.style.display = 'none';
+
+      statusEl.innerHTML =
+        '<div style="background: var(--success-bg, #f0fdf4); border: 1px solid var(--success-color, #16a34a); border-radius: 8px; padding: 12px;">' +
+          '<div style="display: flex; align-items: center; gap: 8px;">' +
+            '<span style="font-size: 20px;">&#10003;</span>' +
+            '<div>' +
+              '<div style="color: var(--success-color, #16a34a); font-weight: 600;">เชื่อมต่อ Google Sheets แล้ว</div>' +
+              '<div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">ระบบเชื่อมต่อกับ Google Sheets ของคุณเรียบร้อยแล้ว</div>' +
+            '</div>' +
+          '</div>' +
+          '<button class="secondary-button" id="btnChangeSheets" style="margin-top: 10px; font-size: 12px; padding: 4px 12px;">เปลี่ยน Sheets</button>' +
+        '</div>';
+
+      // Allow switching to manual input
+      var changeBtn = document.getElementById('btnChangeSheets');
+      if (changeBtn) {
+        changeBtn.addEventListener('click', function() {
+          input.type = 'text';
+          input.value = '';
+          input.placeholder = 'วาง Google Sheets ID ใหม่ที่นี่';
+          if (hintEl) hintEl.style.display = 'block';
+          if (btn) btn.style.display = 'inline-flex';
+          statusEl.innerHTML = '';
+        });
+      }
+    } else if (conn.needsSetup) {
+      // Not connected — show alert to paste Sheets ID
+      input.value = '';
+      statusEl.innerHTML =
+        '<div style="background: #fffbeb; border: 1px solid #f59e0b; border-radius: 8px; padding: 12px; margin-top: 4px;">' +
+          '<div style="display: flex; align-items: flex-start; gap: 8px;">' +
+            '<span style="font-size: 18px;">&#9888;</span>' +
+            '<div>' +
+              '<div style="color: #b45309; font-weight: 600; margin-bottom: 4px;">ยังไม่ได้เชื่อมต่อ Google Sheets</div>' +
+              '<div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">' +
+                'กรุณานำ Google Sheets ID มาวางในช่องด้านบนแล้วกด "เชื่อมต่อ"<br/>' +
+                '<strong>วิธีทำ:</strong> เปิด Google Sheets > คัดลอก ID จาก URL<br/>' +
+                '<code style="font-size: 11px; background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">https://docs.google.com/spreadsheets/d/<strong>[ID]</strong>/edit</code>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+    } else {
+      // Fallback: fetch current ID
+      google.script.run.withSuccessHandler(function(info) {
+        if (info && info.isOwnSheet) {
+          input.value = '';
+          input.type = 'hidden';
+          if (hintEl) hintEl.style.display = 'none';
+          if (btn) btn.style.display = 'none';
+          statusEl.innerHTML =
+            '<div style="background: var(--success-bg, #f0fdf4); border: 1px solid var(--success-color, #16a34a); border-radius: 8px; padding: 12px;">' +
+              '<div style="color: var(--success-color, #16a34a); font-weight: 600;">&#10003; เชื่อมต่อ Google Sheets แล้ว</div>' +
+            '</div>';
+        } else {
+          statusEl.innerHTML = '<span style="color: var(--warning-color, #d97706); font-size: 13px;">&#9888; ยังไม่ได้ตั้งค่า Sheets ID</span>';
+        }
+      }).getSheetsConnectionInfo();
+    }
+
+    btn.addEventListener('click', function() {
+      var sheetsId = input.value.trim();
+      if (!sheetsId) {
+        statusEl.innerHTML = '<span style="color: var(--danger-color, #dc2626); font-size: 13px;">กรุณาใส่ Google Sheets ID</span>';
+        return;
+      }
+
+      var match = sheetsId.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+      if (match) sheetsId = match[1];
+
+      btn.disabled = true;
+      btn.textContent = 'กำลังเชื่อมต่อ...';
+      statusEl.innerHTML = '<span style="color: var(--text-secondary); font-size: 13px;">กำลังตรวจสอบและสร้างโครงสร้าง...</span>';
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          btn.disabled = false;
+          btn.textContent = 'เชื่อมต่อ';
+          if (result.success) {
+            state.sheetsId = sheetsId;
+            state.sheetsConnection = { isConnected: true, isOwnSheet: true };
+            // Hide input after successful connection
+            input.value = '';
+            input.type = 'hidden';
+            if (hintEl) hintEl.style.display = 'none';
+            btn.style.display = 'none';
+            statusEl.innerHTML =
+              '<div style="background: var(--success-bg, #f0fdf4); border: 1px solid var(--success-color, #16a34a); border-radius: 8px; padding: 12px; margin-top: 4px;">' +
+                '<div style="color: var(--success-color, #16a34a); font-weight: 600; margin-bottom: 4px;">&#10003; เชื่อมต่อสำเร็จ!</div>' +
+                '<div style="font-size: 12px; color: var(--text-secondary);">' + (result.message || '') + '</div>' +
+              '</div>';
+            // Clear all old data from previous sheet
+            state.companies = [];
+            state.companyId = "";
+            state.customers = [];
+            state.products = [];
+            state.salespersons = [];
+            state.documents = [];
+            state.unpaidDocs = [];
+            state.kpi = {};
+            state.salesTrend = [];
+            safeLocalStorageSet("companyId", "");
+            if (typeof initCompanySwitcher === 'function') initCompanySwitcher();
+            if (typeof renderAll === 'function') renderAll();
+
+            // Re-fetch companies from the new sheet, then refresh everything
+            runServer('listCompaniesApi').then(function(companies) {
+              state.companies = companies || [];
+              if (state.companies.length > 0) {
+                state.companyId = state.companies[0].entityId || "";
+                safeLocalStorageSet("companyId", state.companyId);
+              }
+              if (typeof initCompanySwitcher === 'function') initCompanySwitcher();
+              if (typeof refreshAll === 'function') {
+                return refreshAll();
+              }
+            }).then(function() {
+              if (typeof loadDocHistory === 'function') loadDocHistory();
+              if (typeof loadPayments === 'function') loadPayments();
+            }).catch(function(err) {
+              console.error('Error refreshing after sheet connect:', err);
+            });
+          } else {
+            statusEl.innerHTML =
+              '<div style="background: #fef2f2; border: 1px solid #dc2626; border-radius: 8px; padding: 12px; margin-top: 4px;">' +
+                '<div style="color: #dc2626; font-weight: 600; margin-bottom: 4px;">&#10007; เชื่อมต่อไม่สำเร็จ</div>' +
+                '<div style="font-size: 12px; color: var(--text-secondary);">' + (result.error || 'ไม่ทราบสาเหตุ') + '</div>' +
+              '</div>';
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.textContent = 'เชื่อมต่อ';
+          statusEl.innerHTML = '<span style="color: #dc2626; font-size: 13px;">Error: ' + err.message + '</span>';
+        })
+        .setupSheetsApi(sheetsId);
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initDatabaseSettings);
+  } else {
+    initDatabaseSettings();
+  }
+})();
+</script>

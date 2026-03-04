@@ -1,0 +1,28 @@
+name = "gridpro-worker"
+main = "src/index.ts"
+compatibility_date = "2025-02-24"
+workers_dev = true
+
+# Custom domain — resolves via Cloudflare DNS (fixes PWA standalone DNS issues with *.workers.dev)
+[[routes]]
+pattern = "api.grid-doc.com"
+custom_domain = true
+
+[vars]
+CORS_ORIGIN = "http://localhost:5173"
+# JWT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET are set via `wrangler secret put`
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "gridpro-db"
+database_id = "f36fe6f6-225b-4e7f-beaa-fed02bd49051"
+
+# R2 Bucket binding (for image storage)
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "gridpro-images"
+
+# Cron triggers — daily at 01:00 UTC (08:00 Bangkok time)
+[triggers]
+crons = ["0 1 * * *"]

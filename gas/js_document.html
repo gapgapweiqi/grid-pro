@@ -1,0 +1,2238 @@
+<script>
+var docState = {
+  items: [],
+  nextItemId: 1,
+  itemMode: "product",
+  docNoEdited: false,
+  signatureImage: "",
+  stampImage: "",
+  availableInvoices: []
+};
+
+function isBillMode() {
+  var docTypeEl = document.getElementById("docTypeSelect");
+  return docTypeEl && docTypeEl.value === "BILL";
+}
+
+function _buildDocNoDatePart(pattern) {
+  var now = new Date();
+  var bYear = now.getFullYear() + 543;
+  var cYear = now.getFullYear();
+  var mm = ("0" + (now.getMonth() + 1)).slice(-2);
+  if (pattern === "A") return String(bYear).slice(-2) + mm;
+  if (pattern === "B") return String(bYear).slice(-2);
+  if (pattern === "C") return String(bYear);
+  if (pattern === "D") return String(cYear).slice(-2) + mm;
+  if (pattern === "E") return String(cYear);
+  return String(bYear).slice(-2) + mm;
+}
+
+function _estimateNextSeq(docType, prefix, datePart, sep) {
+  var docs = state.documents || [];
+  var companyId = state.companyId || "";
+  var pattern = prefix + datePart + sep;
+  var maxSeq = 0;
+  docs.forEach(function(d) {
+    if (String(d.docType) !== docType) return;
+    if (companyId && String(d.companyId) !== companyId) return;
+    var no = d.docNo || "";
+    if (no.indexOf(pattern) === 0) {
+      var tail = no.substring(pattern.length);
+      var num = parseInt(tail, 10);
+      if (!isNaN(num) && num > maxSeq) maxSeq = num;
+    }
+  });
+  return maxSeq + 1;
+}
+
+function generateDocNumberPreview(docType) {
+  var s = state.settings || {};
+  var pattern = s["docNo.pattern"] || "A";
+  var digits = parseInt(s["docNo.digits"] || "4", 10);
+  var sep = s["docNo.separator"] || "-";
+  var prefix = s["docNo.prefix." + docType] || (DOC_CONFIG[docType] || DOC_CONFIG.QUO).prefix || docType;
+  var datePart = _buildDocNoDatePart(pattern);
+  var nextSeq = _estimateNextSeq(docType, prefix, datePart, sep);
+  var seqStr = String(nextSeq);
+  while (seqStr.length < digits) seqStr = "0" + seqStr;
+  return prefix + datePart + sep + seqStr;
+}
+
+function refreshDocNo() {
+  if (docState.docNoEdited) return;
+  var docTypeEl = document.getElementById("docTypeSelect");
+  var docNoInput = document.getElementById("docNoInput");
+  if (!docTypeEl || !docNoInput) return;
+  var docType = docTypeEl.value || "QUO";
+  docNoInput.value = generateDocNumberPreview(docType);
+  docNoInput.style.color = "var(--color-muted)";
+}
+
+function updateDocTypeFields(docType) {
+  var config = DOC_CONFIG[docType] || DOC_CONFIG.QUO;
+  
+  var docNoInput = document.getElementById("docNoInput");
+  if (docNoInput && !docState.docNoEdited) {
+    docNoInput.value = generateDocNumberPreview(docType);
+    docNoInput.style.color = "var(--color-muted)";
+  }
+  
+  var dueDateWrapper = document.getElementById("docDueDateWrapper");
+  var dueDateLabel = document.getElementById("docDueDateLabel");
+  if (dueDateWrapper && dueDateLabel) {
+    if (config.showDueDate || config.showValidUntil) {
+      dueDateWrapper.style.display = "block";
+      dueDateLabel.textContent = config.showValidUntil ? "ใช้ได้ถึง" : "วันครบกำหนด";
+    } else {
+      dueDateWrapper.style.display = "none";
+    }
+  }
+  
+  var customerLabel = document.getElementById("docCustomerLabel");
+  if (customerLabel) {
+    customerLabel.textContent = config.showVendor ? "ข้อมูลผู้ขาย" : "ข้อมูลลูกค้า";
+  }
+
+  var docCustomerSelectLabel = document.getElementById("docCustomerSelectLabel");
+  if (docCustomerSelectLabel) {
+    docCustomerSelectLabel.textContent = config.showVendor ? "เลือกผู้ขาย" : "เลือกลูกค้า";
+  }
+  var docCustomerNameLabel = document.getElementById("docCustomerNameLabel");
+  if (docCustomerNameLabel) {
+    docCustomerNameLabel.textContent = config.showVendor ? "ชื่อผู้ขาย" : "ชื่อลูกค้า";
+  }
+
+  var salespersonWrapper = document.getElementById("docSalespersonWrapper");
+  if (salespersonWrapper) {
+    salespersonWrapper.style.display = config.showVendor ? "none" : "";
+  }
+
+  populateDocumentDropdowns();
+  
+  var termsSection = document.getElementById("docTermsSection");
+  if (termsSection) {
+    termsSection.style.display = "block";
+
+    var docOptPaymentTerms = document.getElementById("docOptPaymentTerms");
+    var paymentTermsBlock = docOptPaymentTerms ? docOptPaymentTerms.closest("div") : null;
+    if (paymentTermsBlock) {
+      paymentTermsBlock.style.display = config.showPaymentTerms ? "block" : "none";
+    }
+    if (docOptPaymentTerms && !config.showPaymentTerms) {
+      docOptPaymentTerms.checked = false;
+    }
+  }
+  
+  var shipToSection = document.getElementById("docShipToSection");
+  if (shipToSection) {
+    shipToSection.style.display = config.showShipTo ? "block" : "none";
+  }
+
+  // BILL mode: toggle UI elements
+  var isBill = (docType === "BILL");
+  var itemModeWrap = document.getElementById("docItemMode");
+  if (itemModeWrap) {
+    var itemModeParent = itemModeWrap.closest("div");
+    if (itemModeParent && itemModeParent.parentElement) {
+      itemModeParent.style.display = isBill ? "none" : "";
+    }
+  }
+  var btnAddDocItem = document.getElementById("btnAddDocItem");
+  if (btnAddDocItem) btnAddDocItem.style.display = isBill ? "none" : "";
+  var btnSelectProduct = document.getElementById("btnSelectProduct");
+  if (btnSelectProduct) btnSelectProduct.style.display = isBill ? "none" : "";
+  var btnSelectInvoice = document.getElementById("btnSelectInvoice");
+  if (btnSelectInvoice) btnSelectInvoice.style.display = isBill ? "" : "none";
+
+  // Toggle table headers for BILL mode
+  var thead = document.querySelector("#docItemsTable thead tr");
+  if (thead) {
+    if (isBill) {
+      thead.innerHTML = '<th style="width: 40px;">#</th><th>เลขที่เอกสาร</th><th style="width: 120px;">วันที่</th><th style="width: 120px;">วันครบกำหนด</th><th style="width: 140px;">จำนวนเงิน</th><th style="width: 50px;"></th>';
+    } else {
+      thead.innerHTML = '<th style="width: 40px;">#</th><th>รายการ</th><th style="width: 80px;">จำนวน</th><th style="width: 100px;">หน่วย</th><th style="width: 120px;">ราคา/หน่วย</th><th style="width: 100px;">ส่วนลด</th><th style="width: 120px;">รวม</th><th style="width: 50px;"></th>';
+    }
+  }
+
+  // BILL mode: hide discount/VAT/WHT option checkboxes and their config sections
+  var billHideIds = ["docOptDiscount", "docOptVat", "docOptVatInc", "docOptWht", "docOptCustomFee"];
+  billHideIds.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) {
+      var label = el.closest("label");
+      if (label) label.style.display = isBill ? "none" : "";
+      if (isBill) el.checked = false;
+    }
+  });
+  if (isBill) {
+    var docDiscountSection = document.getElementById("docDiscountSection");
+    if (docDiscountSection) docDiscountSection.style.display = "none";
+    var docVatSection = document.getElementById("docVatSection");
+    if (docVatSection) docVatSection.style.display = "none";
+    var docWhtSection = document.getElementById("docWhtSection");
+    if (docWhtSection) docWhtSection.style.display = "none";
+  }
+
+  // Items section title
+  var itemsTitle = document.getElementById("itemsTitle");
+  if (itemsTitle) {
+    itemsTitle.textContent = isBill ? "รายการใบแจ้งหนี้" : "รายการสินค้า/บริการ";
+  }
+
+  // Clear items when switching doc type
+  docState.items = [];
+  docState.availableInvoices = [];
+  renderDocItems();
+  recalculateDocTotals();
+
+  // BILL mode: if customer already selected, auto-fetch invoices
+  if (isBill) {
+    var customerSelect = document.getElementById("docCustomerSelect");
+    if (customerSelect && customerSelect.value) {
+      fetchInvoicesForBilling(customerSelect.value);
+    }
+  }
+}
+
+function populateDocumentDropdowns() {
+  var customerSelect = document.getElementById("docCustomerSelect");
+  if (customerSelect) {
+    var currentValue = customerSelect.value;
+    var docTypeEl = document.getElementById("docTypeSelect");
+    var docType = docTypeEl ? docTypeEl.value : "QUO";
+    var config = DOC_CONFIG[docType] || DOC_CONFIG.QUO;
+    var isVendorMode = config.showVendor;
+    var customers = state.customers || [];
+    if (isVendorMode) {
+      customers = customers.filter(function(c) {
+        return (c.json && c.json.customerType) === "VENDOR";
+      });
+    }
+    var placeholder = isVendorMode ? '-- เลือกผู้ขาย --' : '-- เลือกลูกค้า --';
+    customerSelect.innerHTML = '<option value="">' + placeholder + '</option>';
+    customers.forEach(function(c) {
+      var opt = document.createElement("option");
+      opt.value = c.entityId;
+      opt.textContent = c.name + (c.code ? " (" + c.code + ")" : "");
+      customerSelect.appendChild(opt);
+    });
+    if (currentValue) customerSelect.value = currentValue;
+  }
+
+  var salespersonSelect = document.getElementById("docSalespersonSelect");
+  if (salespersonSelect) {
+    var currentSPValue = salespersonSelect.value;
+    var salespersons = state.salespersons || [];
+    salespersonSelect.innerHTML = '<option value="">-- เลือกพนักงานขาย --</option>';
+    salespersons.forEach(function(s) {
+      var opt = document.createElement("option");
+      opt.value = s.entityId;
+      opt.textContent = s.name + (s.code ? " (" + s.code + ")" : "");
+      salespersonSelect.appendChild(opt);
+    });
+    if (currentSPValue) salespersonSelect.value = currentSPValue;
+  }
+}
+
+function initDocumentPage() {
+  var docTypeSelect = document.getElementById("docTypeSelect");
+  if (docTypeSelect) {
+    docTypeSelect.onchange = function() {
+      docState.docNoEdited = false;
+      updateDocTypeFields(docTypeSelect.value);
+      renderBundledDocOptions();
+    };
+    updateDocTypeFields(docTypeSelect.value || "QUO");
+  }
+
+  var docNoInput = document.getElementById("docNoInput");
+  if (docNoInput) {
+    docNoInput.addEventListener("input", function() {
+      docState.docNoEdited = true;
+      docNoInput.style.color = "";
+    });
+  }
+  
+  var customerSelect = document.getElementById("docCustomerSelect");
+  if (customerSelect) {
+    customerSelect.onchange = function() {
+      var allCustomers = state.customers || [];
+      var customer = allCustomers.find(function(c) { return c.entityId === customerSelect.value; });
+      if (customer) {
+        var nameEl = document.getElementById("docCustomerName");
+        var taxIdEl = document.getElementById("docCustomerTaxId");
+        var addressEl = document.getElementById("docCustomerAddress");
+        var phoneEl = document.getElementById("docCustomerPhone");
+        var emailEl = document.getElementById("docCustomerEmail");
+        var isHO = customer.json && customer.json.isHeadOffice;
+        var displayName = (customer.name || "") + (isHO ? " (สำนักงานใหญ่)" : "");
+        if (nameEl) nameEl.value = displayName;
+        if (taxIdEl) taxIdEl.value = customer.taxId || "";
+        if (addressEl) addressEl.value = customer.address || "";
+        if (phoneEl) phoneEl.value = customer.phone || "";
+        if (emailEl) emailEl.value = customer.email || "";
+        // Populate contacts dropdown
+        var contacts = (customer.json && customer.json.contacts) || [];
+        var contactWrapper = document.getElementById("docContactWrapper");
+        var contactSelect = document.getElementById("docContactSelect");
+        if (contactSelect) {
+          contactSelect.innerHTML = '<option value="">ไม่ระบุผู้ติดต่อ</option>';
+          contacts.forEach(function(c) {
+            var opt = document.createElement("option");
+            opt.value = c.name;
+            opt.textContent = c.name + (c.phone ? " (" + c.phone + ")" : "");
+            contactSelect.appendChild(opt);
+          });
+        }
+        if (contactWrapper) contactWrapper.style.display = contacts.length ? "" : "none";
+      } else {
+        var cw = document.getElementById("docContactWrapper");
+        var cs2 = document.getElementById("docContactSelect");
+        if (cw) cw.style.display = "none";
+        if (cs2) cs2.innerHTML = '<option value="">ไม่ระบุผู้ติดต่อ</option>';
+      }
+      // BILL mode: fetch invoices for selected customer
+      if (isBillMode() && customerSelect.value) {
+        fetchInvoicesForBilling(customerSelect.value);
+      } else if (isBillMode()) {
+        docState.availableInvoices = [];
+        docState.items = [];
+        renderDocItems();
+        recalculateDocTotals();
+      }
+    };
+  }
+
+  var today = new Date().toISOString().slice(0, 10);
+  var docDateInput = document.getElementById("docDateInput");
+  if (docDateInput && !docDateInput.value) docDateInput.value = today;
+
+  var paymentTermsSelect = document.getElementById("docPaymentTerms");
+  var paymentTermsCustom = document.getElementById("docPaymentTermsCustom");
+  if (paymentTermsSelect && paymentTermsCustom) {
+    paymentTermsSelect.onchange = function() {
+      paymentTermsCustom.style.display = paymentTermsSelect.value === "custom" ? "block" : "none";
+    };
+  }
+
+  var docOptTerms = document.getElementById("docOptTerms");
+  var docTermsTextWrapper = document.getElementById("docTermsTextWrapper");
+  if (docOptTerms && docTermsTextWrapper) {
+    docOptTerms.onchange = function() {
+      docTermsTextWrapper.style.display = docOptTerms.checked ? "block" : "none";
+    };
+  }
+
+  var docOptDiscount = document.getElementById("docOptDiscount");
+  var docDiscountSection = document.getElementById("docDiscountSection");
+  var docTotalDiscountRow = document.getElementById("docTotalDiscountRow");
+  if (docOptDiscount) {
+    docOptDiscount.onchange = function() {
+      var show = docOptDiscount.checked;
+      if (docDiscountSection) docDiscountSection.style.display = show ? "block" : "none";
+      if (docTotalDiscountRow) docTotalDiscountRow.style.display = show ? "flex" : "none";
+      recalculateDocTotals();
+    };
+  }
+
+  var docOptVat = document.getElementById("docOptVat");
+  var docVatSection = document.getElementById("docVatSection");
+  var docVatRow = document.getElementById("docVatRow");
+  if (docOptVat) {
+    docOptVat.onchange = function() {
+      var show = docOptVat.checked;
+      if (docVatSection) docVatSection.style.display = show ? "block" : "none";
+      if (docVatRow) docVatRow.style.display = show ? "flex" : "none";
+      recalculateDocTotals();
+    };
+  }
+
+  var docOptWht = document.getElementById("docOptWht");
+  var docWhtSection = document.getElementById("docWhtSection");
+  var docWhtRow = document.getElementById("docWhtRow");
+  if (docOptWht) {
+    docOptWht.onchange = function() {
+      var show = docOptWht.checked;
+      if (docWhtSection) docWhtSection.style.display = show ? "block" : "none";
+      if (docWhtRow) docWhtRow.style.display = show ? "flex" : "none";
+      recalculateDocTotals();
+    };
+  }
+
+  var docOptVatInc = document.getElementById("docOptVatInc");
+  if (docOptVatInc) {
+    docOptVatInc.onchange = function() { recalculateDocTotals(); };
+  }
+
+  var docOptCustomFee = document.getElementById("docOptCustomFee");
+  var docCustomFeeSection = document.getElementById("docCustomFeeSection");
+  var docCustomFeeRow = document.getElementById("docCustomFeeRow");
+  if (docOptCustomFee) {
+    docOptCustomFee.onchange = function() {
+      var show = docOptCustomFee.checked;
+      if (docCustomFeeSection) docCustomFeeSection.style.display = show ? "block" : "none";
+      if (docCustomFeeRow) docCustomFeeRow.style.display = show ? "flex" : "none";
+      recalculateDocTotals();
+    };
+  }
+
+  var docCustomFeeName = document.getElementById("docCustomFeeName");
+  var docCustomFeeAmount = document.getElementById("docCustomFeeAmount");
+  if (docCustomFeeName) docCustomFeeName.oninput = function() { recalculateDocTotals(); };
+  if (docCustomFeeAmount) docCustomFeeAmount.oninput = function() { recalculateDocTotals(); };
+
+  var docOptSign = document.getElementById("docOptSign");
+  var docSignatureSection = document.getElementById("docSignatureSection");
+  var docSignDateSection = document.getElementById("docSignDateSection");
+  if (docOptSign) {
+    docOptSign.onchange = function() {
+      var show = docOptSign.checked;
+      if (docSignatureSection) docSignatureSection.style.display = show ? "block" : "none";
+      if (docSignDateSection) docSignDateSection.style.display = show ? "block" : "none";
+    };
+  }
+
+  var btnUploadSign = document.getElementById("btnUploadSign");
+  var docSignInput = document.getElementById("docSignInput");
+  var btnRemoveSign = document.getElementById("btnRemoveSign");
+  var btnClearSignDate = document.getElementById("btnClearSignDate");
+  var docSignDateInput = document.getElementById("docSignDate");
+  var docSignPreview = document.getElementById("docSignPreview");
+  var docSignPlaceholder = document.getElementById("docSignPlaceholder");
+
+  if (btnClearSignDate && docSignDateInput) {
+    btnClearSignDate.onclick = function() {
+      docSignDateInput.value = "";
+    };
+  }
+
+  if (btnUploadSign && docSignInput) {
+    btnUploadSign.onclick = function() { docSignInput.click(); };
+    docSignInput.onchange = function(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      if (file.size > 2 * 1024 * 1024) {
+        showToast("กรุณาเลือกไฟล์ไม่เกิน 2MB", { type: "warning" });
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        resizeImageBase64(ev.target.result, 600, 300, function(resizedSrc) {
+          // Show preview immediately with resized base64
+          if (docSignPreview) {
+            docSignPreview.innerHTML = '<img src="' + resizedSrc + '" style="max-width: 100%; max-height: 100%; object-fit: contain;" />';
+          }
+          if (btnRemoveSign) btnRemoveSign.style.display = "block";
+          // Upload to Drive in background, store URL
+          runServer("uploadCompanyLogoApi", state.companyId, resizedSrc, null, "signature_" + Date.now() + ".png")
+            .then(function(res) {
+              if (res && res.url) {
+                docState.signatureImage = res.url;
+              } else {
+                docState.signatureImage = resizedSrc; // fallback to base64
+              }
+            }).catch(function() {
+              docState.signatureImage = resizedSrc; // fallback to base64
+            });
+        });
+      };
+      reader.readAsDataURL(file);
+    };
+  }
+  if (btnRemoveSign) {
+    btnRemoveSign.onclick = function() {
+      docState.signatureImage = "";
+      if (docSignPreview) {
+        docSignPreview.innerHTML = '<span id="docSignPlaceholder" style="font-size: 11px; color: #9ca3af;">ยังไม่มีลายเซ็น</span>';
+      }
+      if (docSignInput) docSignInput.value = "";
+      btnRemoveSign.style.display = "none";
+    };
+  }
+
+  var docOptStamp = document.getElementById("docOptStamp");
+  var docStampSection = document.getElementById("docStampSection");
+  if (docOptStamp) {
+    docOptStamp.onchange = function() {
+      if (docStampSection) docStampSection.style.display = docOptStamp.checked ? "block" : "none";
+      if (docOptStamp.checked) updateStampPreview();
+    };
+  }
+
+  var stampSourceLogo = document.getElementById("stampSourceLogo");
+  var stampSourceCustom = document.getElementById("stampSourceCustom");
+  var docStampUploadWrap = document.getElementById("docStampUploadWrap");
+  function updateStampPreview() {
+    var preview = document.getElementById("docStampPreview");
+    if (!preview) return;
+    var isLogo = stampSourceLogo && stampSourceLogo.checked;
+    if (isLogo) {
+      var company = (state.companies || []).find(function(c) { return c.entityId === state.companyId; });
+      var logo = company && company.json ? company.json.logo : "";
+      if (logo) {
+        preview.innerHTML = '<span style="font-size: 11px; color: #9ca3af;">กำลังแปลง...</span>';
+        var doGrayscaleAndUpload = function(src) {
+          convertToGrayscale(src, function(graySrc) {
+            preview.innerHTML = '<img src="' + graySrc + '" style="max-width: 100%; max-height: 100%; object-fit: contain;" />';
+            // Upload grayscale stamp to Drive if it's base64
+            if (graySrc && graySrc.indexOf("data:") === 0) {
+              runServer("uploadCompanyLogoApi", state.companyId, graySrc, null, "stamp_logo_" + Date.now() + ".png")
+                .then(function(res) {
+                  if (res && res.url) {
+                    docState.stampImage = res.url;
+                  } else {
+                    docState.stampImage = graySrc;
+                  }
+                }).catch(function() {
+                  docState.stampImage = graySrc;
+                });
+            } else {
+              docState.stampImage = graySrc;
+            }
+          });
+        };
+        if (logo.indexOf("http") === 0) {
+          runServer("fetchImageBase64Api", logo).then(function(b64) {
+            doGrayscaleAndUpload(b64 || logo);
+          }).catch(function() { doGrayscaleAndUpload(logo); });
+        } else {
+          doGrayscaleAndUpload(logo);
+        }
+      } else {
+        preview.innerHTML = '<span style="font-size: 11px; color: #9ca3af;">ยังไม่มี Logo</span>';
+        docState.stampImage = "";
+      }
+    } else if (!docState.stampImage || (stampSourceLogo && !stampSourceLogo.checked && !docState.stampImage)) {
+      preview.innerHTML = '<span style="font-size: 11px; color: #9ca3af;">ไม่มีรูป</span>';
+    }
+  }
+  if (stampSourceLogo) {
+    stampSourceLogo.onchange = function() {
+      if (docStampUploadWrap) docStampUploadWrap.style.display = "none";
+      updateStampPreview();
+    };
+  }
+  if (stampSourceCustom) {
+    stampSourceCustom.onchange = function() {
+      if (docStampUploadWrap) docStampUploadWrap.style.display = "block";
+      if (!docState.stampImage) {
+        var preview = document.getElementById("docStampPreview");
+        if (preview) preview.innerHTML = '<span style="font-size: 11px; color: #9ca3af;">ไม่มีรูป</span>';
+      }
+    };
+  }
+
+  var btnUploadStamp = document.getElementById("btnUploadStamp");
+  var docStampInput = document.getElementById("docStampInput");
+  var btnRemoveStamp = document.getElementById("btnRemoveStamp");
+  if (btnUploadStamp && docStampInput) {
+    btnUploadStamp.onclick = function() { docStampInput.click(); };
+    docStampInput.onchange = function(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      if (file.size > 2 * 1024 * 1024) {
+        showToast("กรุณาเลือกไฟล์ไม่เกิน 2MB", { type: "warning" });
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        resizeImageBase64(ev.target.result, 600, 600, function(resizedSrc) {
+          convertToGrayscale(resizedSrc, function(graySrc) {
+            // Show preview immediately
+            var preview = document.getElementById("docStampPreview");
+            if (preview) preview.innerHTML = '<img src="' + graySrc + '" style="max-width: 100%; max-height: 100%; object-fit: contain;" />';
+            if (btnRemoveStamp) btnRemoveStamp.style.display = "block";
+            // Upload to Drive in background, store URL
+            runServer("uploadCompanyLogoApi", state.companyId, graySrc, null, "stamp_" + Date.now() + ".png")
+              .then(function(res) {
+                if (res && res.url) {
+                  docState.stampImage = res.url;
+                } else {
+                  docState.stampImage = graySrc;
+                }
+              }).catch(function() {
+                docState.stampImage = graySrc;
+              });
+          });
+        });
+      };
+      reader.readAsDataURL(file);
+    };
+  }
+  if (btnRemoveStamp) {
+    btnRemoveStamp.onclick = function() {
+      docState.stampImage = "";
+      var preview = document.getElementById("docStampPreview");
+      if (preview) preview.innerHTML = '<span style="font-size: 11px; color: #9ca3af;">ไม่มีรูป</span>';
+      if (docStampInput) docStampInput.value = "";
+      btnRemoveStamp.style.display = "none";
+    };
+  }
+
+  ["docDiscountValue", "docDiscountType", "docVatRate", "docWhtRate"].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.onchange = recalculateDocTotals;
+  });
+
+  var docItemModeEl = document.getElementById("docItemMode");
+  if (docItemModeEl) {
+    docItemModeEl.onchange = function() {
+      docState.itemMode = docItemModeEl.value;
+      renderDocItems();
+    };
+  }
+
+  var btnAddDocItem = document.getElementById("btnAddDocItem");
+  if (btnAddDocItem) btnAddDocItem.onclick = function() { addDocItem(); };
+
+  var btnSelectProduct = document.getElementById("btnSelectProduct");
+  if (btnSelectProduct) btnSelectProduct.onclick = openProductPicker;
+
+  var btnSelectInvoice = document.getElementById("btnSelectInvoice");
+  if (btnSelectInvoice) btnSelectInvoice.onclick = openInvoicePicker;
+
+  var closeInvoicePickerModal = document.getElementById("closeInvoicePickerModal");
+  if (closeInvoicePickerModal) closeInvoicePickerModal.onclick = function() {
+    document.getElementById("invoicePickerModal").style.display = "none";
+  };
+  var invoicePickerModal = document.getElementById("invoicePickerModal");
+  if (invoicePickerModal) {
+    invoicePickerModal.onclick = function(e) {
+      if (e.target === invoicePickerModal) invoicePickerModal.style.display = "none";
+    };
+  }
+
+  var btnPreviewDoc = document.getElementById("btnPreviewDoc");
+  if (btnPreviewDoc) btnPreviewDoc.onclick = openPreviewModal;
+
+  var btnSaveDoc = document.getElementById("btnSaveDoc");
+  if (btnSaveDoc) {
+    btnSaveDoc.onclick = function() {
+      saveDocumentToHistory();
+    };
+  }
+
+
+  var closePreviewModal = document.getElementById("closePreviewModal");
+  if (closePreviewModal) closePreviewModal.onclick = function() {
+    document.getElementById("previewModal").style.display = "none";
+  };
+
+  var btnPrintDoc = document.getElementById("btnPrintDoc");
+  if (btnPrintDoc) btnPrintDoc.onclick = printDocument;
+
+  var btnDownloadPDF = document.getElementById("btnDownloadPDF");
+  if (btnDownloadPDF) btnDownloadPDF.onclick = downloadPDF;
+
+  var closeProductPickerModal = document.getElementById("closeProductPickerModal");
+  if (closeProductPickerModal) closeProductPickerModal.onclick = function() {
+    document.getElementById("productPickerModal").style.display = "none";
+  };
+
+  var previewModal = document.getElementById("previewModal");
+  if (previewModal) {
+    previewModal.onclick = function(e) {
+      if (e.target === previewModal) previewModal.style.display = "none";
+    };
+  }
+
+  var productPickerModal = document.getElementById("productPickerModal");
+  if (productPickerModal) {
+    productPickerModal.onclick = function(e) {
+      if (e.target === productPickerModal) productPickerModal.style.display = "none";
+    };
+  }
+
+  // Bundled doc picker events
+  var btnOpenBundledPicker = document.getElementById("btnOpenBundledPicker");
+  if (btnOpenBundledPicker) btnOpenBundledPicker.onclick = openBundledDocPicker;
+  var closeBundledBtn = document.getElementById("closeBundledDocPicker");
+  if (closeBundledBtn) closeBundledBtn.onclick = closeBundledDocPicker;
+  var cancelBundledBtn = document.getElementById("btnCancelBundledPicker");
+  if (cancelBundledBtn) cancelBundledBtn.onclick = closeBundledDocPicker;
+  var confirmBundledBtn = document.getElementById("btnConfirmBundledPicker");
+  if (confirmBundledBtn) confirmBundledBtn.onclick = confirmBundledDocPicker;
+  var bundledModal = document.getElementById("bundledDocPickerModal");
+  if (bundledModal) {
+    bundledModal.onclick = function(e) {
+      if (e.target === bundledModal) closeBundledDocPicker();
+    };
+  }
+
+  renderDocItems();
+  initDocLangSelect();
+  renderTermsPresets();
+  renderSignPresets();
+  renderStampPresets();
+  renderNotePresets();
+  renderItemPresets();
+  renderBundledDocOptions();
+}
+
+function addDocItem(product) {
+  var item = {
+    id: docState.nextItemId++,
+    productId: product ? product.entityId : "",
+    name: product ? product.name : "",
+    qty: 1,
+    unit: product && product.json ? product.json.unit || "" : "",
+    price: product && product.json ? product.json.price || 0 : 0,
+    discount: 0,
+    discountType: "amount",
+    details: product && product.json && product.json.serviceDesc ? product.json.serviceDesc : ""
+  };
+  docState.items.push(item);
+  renderDocItems();
+  recalculateDocTotals();
+}
+
+function removeDocItem(itemId) {
+  docState.items = docState.items.filter(function(i) { return i.id !== itemId; });
+  renderDocItems();
+  recalculateDocTotals();
+}
+
+function updateDocItem(itemId, field, value) {
+  var item = docState.items.find(function(i) { return i.id === itemId; });
+  if (!item) return;
+  if (field === "qty" || field === "price" || field === "discount") {
+    item[field] = parseFloat(value) || 0;
+  } else {
+    item[field] = value;
+  }
+  recalculateDocTotals();
+  var row = document.querySelector('tr[data-item-id="' + itemId + '"]');
+  if (row) {
+    var totalCell = row.querySelector(".item-total");
+    if (totalCell) {
+      var lineTotal = calcLineTotal(item);
+      totalCell.textContent = formatMoney(lineTotal);
+    }
+  }
+}
+
+function calcLineTotal(item) {
+  var subtotal = item.qty * item.price;
+  var discount = 0;
+  if (item.discountType === "percent") {
+    discount = subtotal * (item.discount / 100);
+  } else {
+    discount = item.discount;
+  }
+  return Math.max(0, subtotal - discount);
+}
+
+function renderDocItems() {
+  var tbody = document.getElementById("docItemsTbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  // BILL mode rendering
+  if (isBillMode()) {
+    if (!docState.items.length) {
+      var tr = document.createElement("tr");
+      var td = document.createElement("td");
+      td.colSpan = 6;
+      td.className = "muted";
+      td.style.textAlign = "center";
+      td.style.padding = "24px";
+      var customerSelect = document.getElementById("docCustomerSelect");
+      td.textContent = (customerSelect && customerSelect.value) ? 'กดปุ่ม "เลือกใบแจ้งหนี้" เพื่อเพิ่มรายการ' : 'กรุณาเลือกลูกค้าก่อนเพื่อดึงรายการใบแจ้งหนี้';
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+      return;
+    }
+    docState.items.forEach(function(item, index) {
+      var tr = document.createElement("tr");
+      tr.dataset.itemId = item.id;
+      var tdNo = document.createElement("td");
+      tdNo.textContent = index + 1;
+      var tdDocRef = document.createElement("td");
+      tdDocRef.textContent = item.docRef || item.name || "-";
+      tdDocRef.style.fontWeight = "500";
+      var tdDocDate = document.createElement("td");
+      tdDocDate.textContent = item.docDate ? formatDocDate(item.docDate) : "-";
+      var tdDueDate = document.createElement("td");
+      tdDueDate.textContent = item.dueDate ? formatDocDate(item.dueDate) : "-";
+      var tdAmount = document.createElement("td");
+      tdAmount.className = "item-total";
+      tdAmount.style.textAlign = "right";
+      tdAmount.textContent = formatMoney(item.price || 0);
+      var tdActions = document.createElement("td");
+      var btnRemove = document.createElement("button");
+      btnRemove.type = "button";
+      btnRemove.className = "icon-button";
+      btnRemove.textContent = "✕";
+      btnRemove.style.padding = "4px 8px";
+      btnRemove.onclick = function() { removeDocItem(item.id); };
+      tdActions.appendChild(btnRemove);
+      tr.appendChild(tdNo);
+      tr.appendChild(tdDocRef);
+      tr.appendChild(tdDocDate);
+      tr.appendChild(tdDueDate);
+      tr.appendChild(tdAmount);
+      tr.appendChild(tdActions);
+      tbody.appendChild(tr);
+    });
+    return;
+  }
+
+  // Normal mode rendering
+  if (!docState.items.length) {
+    var tr = document.createElement("tr");
+    var td = document.createElement("td");
+    td.colSpan = 8;
+    td.className = "muted";
+    td.style.textAlign = "center";
+    td.style.padding = "24px";
+    td.textContent = 'กดปุ่ม "+ เพิ่มรายการ" เพื่อเพิ่มสินค้า/บริการ';
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    return;
+  }
+
+  docState.items.forEach(function(item, index) {
+    var tr = document.createElement("tr");
+    tr.dataset.itemId = item.id;
+
+    var tdNo = document.createElement("td");
+    tdNo.textContent = index + 1;
+
+    var tdName = document.createElement("td");
+    var nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.className = "field-control";
+    nameInput.value = item.name;
+    nameInput.placeholder = "ชื่อรายการ";
+    nameInput.onchange = function() { updateDocItem(item.id, "name", nameInput.value); };
+    tdName.appendChild(nameInput);
+
+    var tdQty = document.createElement("td");
+    var qtyInput = document.createElement("input");
+    qtyInput.type = "number";
+    qtyInput.className = "field-control";
+    qtyInput.value = item.qty;
+    qtyInput.min = "0";
+    qtyInput.step = "1";
+    qtyInput.style.width = "70px";
+    qtyInput.onchange = function() { updateDocItem(item.id, "qty", qtyInput.value); };
+    tdQty.appendChild(qtyInput);
+
+    var tdUnit = document.createElement("td");
+    var unitInput = document.createElement("input");
+    unitInput.type = "text";
+    unitInput.className = "field-control";
+    unitInput.value = item.unit;
+    unitInput.placeholder = "หน่วย";
+    unitInput.style.width = "80px";
+    unitInput.onchange = function() { updateDocItem(item.id, "unit", unitInput.value); };
+    tdUnit.appendChild(unitInput);
+
+    var tdPrice = document.createElement("td");
+    var priceInput = document.createElement("input");
+    priceInput.type = "number";
+    priceInput.className = "field-control";
+    priceInput.value = item.price;
+    priceInput.min = "0";
+    priceInput.step = "0.01";
+    priceInput.style.width = "100px";
+    priceInput.onchange = function() { updateDocItem(item.id, "price", priceInput.value); };
+    tdPrice.appendChild(priceInput);
+
+    var tdDiscount = document.createElement("td");
+    var discountWrap = document.createElement("div");
+    discountWrap.className = "discount-wrap";
+    var discountInput = document.createElement("input");
+    discountInput.type = "number";
+    discountInput.className = "field-control";
+    discountInput.value = item.discount;
+    discountInput.min = "0";
+    discountInput.onchange = function() { updateDocItem(item.id, "discount", discountInput.value); };
+    var discountTypeSelect = document.createElement("select");
+    discountTypeSelect.className = "field-control discount-type-select";
+    discountTypeSelect.innerHTML = '<option value="amount">฿</option><option value="percent">%</option>';
+    discountTypeSelect.value = item.discountType;
+    discountTypeSelect.onchange = function() {
+      item.discountType = discountTypeSelect.value;
+      recalculateDocTotals();
+      var row = document.querySelector('tr[data-item-id="' + item.id + '"]');
+      if (row) {
+        var totalCell = row.querySelector(".item-total");
+        if (totalCell) totalCell.textContent = formatMoney(calcLineTotal(item));
+      }
+    };
+    discountWrap.appendChild(discountInput);
+    discountWrap.appendChild(discountTypeSelect);
+    tdDiscount.appendChild(discountWrap);
+
+    var tdTotal = document.createElement("td");
+    tdTotal.className = "item-total";
+    tdTotal.textContent = formatMoney(calcLineTotal(item));
+
+    var tdActions = document.createElement("td");
+    var btnRemove = document.createElement("button");
+    btnRemove.type = "button";
+    btnRemove.className = "icon-button";
+    btnRemove.textContent = "✕";
+    btnRemove.style.padding = "4px 8px";
+    btnRemove.onclick = function() { removeDocItem(item.id); };
+    tdActions.appendChild(btnRemove);
+
+    tr.appendChild(tdNo);
+    tr.appendChild(tdName);
+    tr.appendChild(tdQty);
+    tr.appendChild(tdUnit);
+    tr.appendChild(tdPrice);
+    tr.appendChild(tdDiscount);
+    tr.appendChild(tdTotal);
+    tr.appendChild(tdActions);
+    tbody.appendChild(tr);
+
+    // Service mode: add details row below
+    if (docState.itemMode === "service") {
+      var trDetails = document.createElement("tr");
+      trDetails.className = "item-details-row";
+      var tdEmpty = document.createElement("td");
+      var tdDetailsCell = document.createElement("td");
+      tdDetailsCell.colSpan = 7;
+      var detailsTextarea = document.createElement("textarea");
+      detailsTextarea.className = "field-control";
+      detailsTextarea.rows = 3;
+      detailsTextarea.placeholder = "รายละเอียดงานบริการ (แต่ละบรรทัดจะแสดงเป็น - รายการย่อย)";
+      detailsTextarea.value = item.details || "";
+      detailsTextarea.style.width = "100%";
+      detailsTextarea.style.fontSize = "13px";
+      detailsTextarea.onchange = function() { updateDocItem(item.id, "details", detailsTextarea.value); };
+      tdDetailsCell.appendChild(detailsTextarea);
+      trDetails.appendChild(tdEmpty);
+      trDetails.appendChild(tdDetailsCell);
+      tbody.appendChild(trDetails);
+    }
+  });
+}
+
+function recalculateDocTotals() {
+  // BILL mode: aggregate financial details from invoices
+  if (isBillMode()) {
+    var totalSubtotal = 0, totalDiscount = 0, totalBeforeTax = 0;
+    var totalVat = 0, totalWht = 0, totalGrand = 0;
+    var hasDiscount = false, hasVat = false, hasWht = false;
+
+    docState.items.forEach(function(item) {
+      totalSubtotal += Number(item.invSubtotal) || Number(item.price) || 0;
+      totalDiscount += Number(item.invDiscountAmount) || 0;
+      totalBeforeTax += Number(item.invTotalBeforeTax) || Number(item.price) || 0;
+      totalVat += Number(item.invVatAmount) || 0;
+      totalWht += Number(item.invWhtAmount) || 0;
+      totalGrand += Number(item.price) || 0;
+      if (Number(item.invDiscountAmount) > 0) hasDiscount = true;
+      if (item.invVatEnabled || Number(item.invVatAmount) > 0) hasVat = true;
+      if (item.invWhtEnabled || Number(item.invWhtAmount) > 0) hasWht = true;
+    });
+
+    setText("docSubtotal", formatMoney(totalSubtotal));
+    setText("docItemDiscount", "-" + formatMoney(totalDiscount));
+    setText("docAfterDiscount", formatMoney(totalBeforeTax));
+    setText("docVatAmount", formatMoney(totalVat));
+    setText("docWhtAmount", "-" + formatMoney(totalWht));
+    setText("docGrandTotal", formatMoney(totalGrand));
+
+    // Show/hide summary rows based on aggregated data
+    var discountRow = document.getElementById("docDiscountRow");
+    if (discountRow) discountRow.style.display = hasDiscount ? "flex" : "none";
+    var totalDiscountRow = document.getElementById("docTotalDiscountRow");
+    if (totalDiscountRow) totalDiscountRow.style.display = "none";
+
+    var subtotalRow = document.getElementById("docSubtotalRow");
+    if (subtotalRow) subtotalRow.style.display = "flex";
+    var afterDiscountRow = document.getElementById("docAfterDiscountRow");
+    if (afterDiscountRow) afterDiscountRow.style.display = (hasDiscount || hasVat || hasWht) ? "flex" : "none";
+
+    var vatRow = document.getElementById("docVatRow");
+    if (vatRow) {
+      vatRow.style.display = hasVat ? "flex" : "none";
+      var vatLabel = vatRow.querySelector("span:first-child");
+      if (vatLabel) vatLabel.textContent = "VAT (จากใบแจ้งหนี้)";
+    }
+    var whtRow = document.getElementById("docWhtRow");
+    if (whtRow) {
+      whtRow.style.display = hasWht ? "flex" : "none";
+      var whtLabel = whtRow.querySelector("span:first-child");
+      if (whtLabel) whtLabel.textContent = "หัก ณ ที่จ่าย (จากใบแจ้งหนี้)";
+    }
+    return;
+  }
+
+  // Normal mode
+  var subtotal = 0;
+  var itemDiscountTotal = 0;
+
+  docState.items.forEach(function(item) {
+    var lineSubtotal = item.qty * item.price;
+    subtotal += lineSubtotal;
+    if (item.discountType === "percent") {
+      itemDiscountTotal += lineSubtotal * (item.discount / 100);
+    } else {
+      itemDiscountTotal += item.discount;
+    }
+  });
+
+  var afterItemDiscount = subtotal - itemDiscountTotal;
+
+  var totalDiscount = 0;
+  var docOptDiscount = document.getElementById("docOptDiscount");
+  if (docOptDiscount && docOptDiscount.checked) {
+    var discountValueEl = document.getElementById("docDiscountValue");
+    var discountTypeEl = document.getElementById("docDiscountType");
+    var discountValue = parseFloat(discountValueEl ? discountValueEl.value : 0) || 0;
+    var discountType = discountTypeEl ? discountTypeEl.value : "percent";
+    if (discountType === "percent") {
+      totalDiscount = afterItemDiscount * (discountValue / 100);
+    } else {
+      totalDiscount = discountValue;
+    }
+  }
+
+  var afterDiscount = afterItemDiscount - totalDiscount;
+
+  var vatAmount = 0;
+  var docOptVat = document.getElementById("docOptVat");
+  var docOptVatInc = document.getElementById("docOptVatInc");
+  var vatRateEl = document.getElementById("docVatRate");
+  var vatRate = parseFloat(vatRateEl ? vatRateEl.value : 7) || 7;
+  var vatInclusive = docOptVatInc ? docOptVatInc.checked : false;
+  if (docOptVat && docOptVat.checked) {
+    if (vatInclusive) {
+      var beforeTax = afterDiscount / (1 + vatRate / 100);
+      vatAmount = afterDiscount - beforeTax;
+    } else {
+      vatAmount = afterDiscount * (vatRate / 100);
+    }
+  }
+
+  var whtAmount = 0;
+  var docOptWht = document.getElementById("docOptWht");
+  var whtRateEl = document.getElementById("docWhtRate");
+  var whtRate = parseFloat(whtRateEl ? whtRateEl.value : 3) || 3;
+  if (docOptWht && docOptWht.checked) {
+    var whtBase = afterDiscount;
+    if (docOptVat && docOptVat.checked && vatInclusive) {
+      whtBase = afterDiscount / (1 + vatRate / 100);
+    }
+    whtAmount = whtBase * (whtRate / 100);
+  }
+
+  var customFeeAmount = 0;
+  var docOptCustomFee = document.getElementById("docOptCustomFee");
+  var customFeeNameEl = document.getElementById("docCustomFeeName");
+  var customFeeAmountEl = document.getElementById("docCustomFeeAmount");
+  if (docOptCustomFee && docOptCustomFee.checked) {
+    customFeeAmount = parseFloat(customFeeAmountEl ? customFeeAmountEl.value : 0) || 0;
+  }
+
+  var grandTotal = vatInclusive ? (afterDiscount - whtAmount + customFeeAmount) : (afterDiscount + vatAmount - whtAmount + customFeeAmount);
+
+  setText("docSubtotal", formatMoney(subtotal));
+  setText("docItemDiscount", "-" + formatMoney(itemDiscountTotal));
+  setText("docTotalDiscount", "-" + formatMoney(totalDiscount));
+  setText("docAfterDiscount", formatMoney(afterDiscount));
+  setText("docVatAmount", formatMoney(vatAmount));
+  setText("docWhtAmount", "-" + formatMoney(whtAmount));
+  setText("docCustomFeeDisplay", formatMoney(customFeeAmount));
+  setText("docGrandTotal", formatMoney(grandTotal));
+
+  var vatRowLabel = document.querySelector("#docVatRow span:first-child");
+  if (vatRowLabel) vatRowLabel.textContent = (vatInclusive ? "แยก VAT " : "VAT ") + vatRate + "%";
+
+  var whtRowLabel = document.querySelector("#docWhtRow span:first-child");
+  if (whtRowLabel) whtRowLabel.textContent = "หัก ณ ที่จ่าย " + whtRate + "%";
+
+  var customFeeRowLabel = document.querySelector("#docCustomFeeRow span:first-child");
+  if (customFeeRowLabel) customFeeRowLabel.textContent = (customFeeNameEl && customFeeNameEl.value.trim()) || "ค่าใช้จ่ายเพิ่มเติม";
+}
+
+// ===== BILL Mode: Invoice Functions =====
+
+function fetchInvoicesForBilling(customerId) {
+  var companyId = state.companyId || "";
+  showToast("กำลังโหลดใบแจ้งหนี้...", { type: "info" });
+  runServer("listInvoicesForBillingApi", companyId, customerId)
+    .then(function(invoices) {
+      _applyBillingInvoices(invoices);
+    })
+    .catch(function(err) {
+      var errMsg = (err && err.message) || String(err);
+      if (errMsg.indexOf("Unknown server function") !== -1) {
+        console.log("[fetchInvoicesForBilling] fallback to client-side filtering");
+        var invoices = _filterInvoicesClientSide(companyId, customerId);
+        _applyBillingInvoices(invoices);
+      } else {
+        console.error("fetchInvoicesForBilling error:", err);
+        showToast("โหลดใบแจ้งหนี้ไม่สำเร็จ: " + errMsg, { type: "error" });
+      }
+    });
+}
+
+function _filterInvoicesClientSide(companyId, customerId) {
+  var docs = state.documents || [];
+  return docs.filter(function(d) {
+    if (String(d.docType) !== "INV") return false;
+    if (String(d.customerId) !== String(customerId)) return false;
+    if (companyId && String(d.companyId) !== String(companyId)) return false;
+    var status = String(d.paymentStatus || "UNPAID").toUpperCase();
+    return status === "UNPAID" || status === "";
+  }).map(function(inv) {
+    var sub = Number(inv.subtotal) || Number(inv.grandTotal) || 0;
+    return {
+      docId: inv.docId || "",
+      docNo: inv.docNo || "",
+      docDate: inv.docDate || "",
+      dueDate: inv.dueDate || "",
+      grandTotal: Number(inv.grandTotal) || 0,
+      subtotal: sub,
+      discountAmount: 0,
+      totalBeforeTax: sub,
+      vatEnabled: false,
+      vatRate: 0,
+      vatAmount: Number(inv.vatAmount) || 0,
+      whtEnabled: false,
+      whtRate: 0,
+      whtAmount: Number(inv.whtAmount) || 0,
+      usedInBill: false,
+      billDocNo: ""
+    };
+  });
+}
+
+function _applyBillingInvoices(invoices) {
+  docState.availableInvoices = invoices || [];
+  docState.items = [];
+  renderDocItems();
+  recalculateDocTotals();
+  if (!invoices || !invoices.length) {
+    showToast("ไม่พบใบแจ้งหนี้ที่ยังไม่ชำระของลูกค้านี้", { type: "warning" });
+  } else {
+    showToast("พบ " + invoices.length + " ใบแจ้งหนี้", { type: "success" });
+  }
+}
+
+function openInvoicePicker() {
+  var customerSelect = document.getElementById("docCustomerSelect");
+  if (!customerSelect || !customerSelect.value) {
+    showToast("กรุณาเลือกลูกค้าก่อน", { type: "warning" });
+    return;
+  }
+
+  var modal = document.getElementById("invoicePickerModal");
+  if (!modal) return;
+  modal.style.display = "flex";
+
+  var list = document.getElementById("invoicePickerList");
+  if (!list) return;
+  list.innerHTML = "";
+
+  var invoices = docState.availableInvoices || [];
+  if (!invoices.length) {
+    list.innerHTML = '<div class="muted" style="padding: 24px; text-align: center;">ไม่พบใบแจ้งหนี้ที่ยังไม่ชำระ</div>';
+    return;
+  }
+
+  // Track which invoices are already added
+  var addedDocIds = {};
+  docState.items.forEach(function(item) {
+    if (item.refDocId) addedDocIds[item.refDocId] = true;
+  });
+
+  invoices.forEach(function(inv) {
+    var item = document.createElement("div");
+    item.className = "product-picker-item";
+    item.style.flexDirection = "column";
+    item.style.alignItems = "flex-start";
+    item.style.gap = "4px";
+    item.style.padding = "12px";
+
+    var isUsed = inv.usedInBill;
+    var isAdded = addedDocIds[inv.docId];
+    var disabled = isUsed || isAdded;
+
+    var topRow = '<div style="display:flex;justify-content:space-between;width:100%;align-items:center;">';
+    topRow += '<span style="font-weight:600;">' + (inv.docNo || "-") + '</span>';
+    topRow += '<span style="font-weight:600;color:#065f46;">' + formatMoney(inv.grandTotal || 0) + '</span>';
+    topRow += '</div>';
+
+    var bottomRow = '<div style="display:flex;gap:16px;font-size:12px;color:#6b7280;">';
+    bottomRow += '<span>วันที่: ' + (inv.docDate ? formatDocDate(inv.docDate) : "-") + '</span>';
+    bottomRow += '<span>ครบกำหนด: ' + (inv.dueDate ? formatDocDate(inv.dueDate) : "-") + '</span>';
+    if (isUsed) {
+      bottomRow += '<span style="color:#dc2626;font-weight:500;">ใช้แล้วใน ' + inv.billDocNo + '</span>';
+    }
+    if (isAdded) {
+      bottomRow += '<span style="color:#2563eb;font-weight:500;">เพิ่มแล้ว</span>';
+    }
+    bottomRow += '</div>';
+
+    item.innerHTML = topRow + bottomRow;
+
+    if (disabled) {
+      item.style.opacity = "0.5";
+      item.style.cursor = "not-allowed";
+    } else {
+      item.style.cursor = "pointer";
+      item.onclick = function() {
+        addBillInvoiceItem(inv);
+        // Mark as added
+        item.style.opacity = "0.5";
+        item.style.cursor = "not-allowed";
+        item.onclick = null;
+        var badge = document.createElement("span");
+        badge.style.cssText = "color:#2563eb;font-weight:500;font-size:12px;";
+        badge.textContent = "เพิ่มแล้ว";
+        item.querySelector("div:last-child").appendChild(badge);
+      };
+    }
+
+    list.appendChild(item);
+  });
+
+  var searchInput = document.getElementById("invoiceSearchInput");
+  if (searchInput) {
+    searchInput.value = "";
+    searchInput.oninput = function() {
+      var query = searchInput.value.toLowerCase();
+      list.querySelectorAll(".product-picker-item").forEach(function(el) {
+        var text = el.textContent.toLowerCase();
+        el.style.display = text.includes(query) ? "flex" : "none";
+      });
+    };
+  }
+}
+
+function addBillInvoiceItem(inv) {
+  // Prevent duplicate
+  var exists = docState.items.some(function(i) { return i.refDocId === inv.docId; });
+  if (exists) {
+    showToast("ใบแจ้งหนี้นี้ถูกเพิ่มแล้ว", { type: "warning" });
+    return;
+  }
+  var item = {
+    id: docState.nextItemId++,
+    refDocId: inv.docId,
+    docRef: inv.docNo || "",
+    name: inv.docNo || "",
+    docDate: inv.docDate || "",
+    dueDate: inv.dueDate || "",
+    price: Number(inv.grandTotal) || 0,
+    qty: 1,
+    unit: "",
+    discount: 0,
+    discountType: "amount",
+    productId: inv.docId,
+    invSubtotal: Number(inv.subtotal) || 0,
+    invDiscountAmount: Number(inv.discountAmount) || 0,
+    invTotalBeforeTax: Number(inv.totalBeforeTax) || 0,
+    invVatEnabled: inv.vatEnabled || false,
+    invVatRate: Number(inv.vatRate) || 0,
+    invVatAmount: Number(inv.vatAmount) || 0,
+    invWhtEnabled: inv.whtEnabled || false,
+    invWhtRate: Number(inv.whtRate) || 0,
+    invWhtAmount: Number(inv.whtAmount) || 0
+  };
+  docState.items.push(item);
+  renderDocItems();
+  recalculateDocTotals();
+}
+
+function openProductPicker() {
+  var modal = document.getElementById("productPickerModal");
+  if (!modal) return;
+  modal.style.display = "flex";
+
+  var list = document.getElementById("productPickerList");
+  if (!list) return;
+  list.innerHTML = "";
+
+  var products = state.products || [];
+  if (!products.length) {
+    list.innerHTML = '<div class="muted" style="padding: 24px; text-align: center;">ไม่มีสินค้าในระบบ</div>';
+    return;
+  }
+
+  products.forEach(function(p) {
+    var item = document.createElement("div");
+    item.className = "product-picker-item";
+    item.innerHTML = '<span class="product-name">' + (p.name || "ไม่มีชื่อ") + '</span><span class="product-price">' + formatMoney((p.json && p.json.price) || 0) + '</span>';
+    item.onclick = function() {
+      addDocItem(p);
+      modal.style.display = "none";
+    };
+    list.appendChild(item);
+  });
+
+  var searchInput = document.getElementById("productSearchInput");
+  if (searchInput) {
+    searchInput.value = "";
+    searchInput.oninput = function() {
+      var query = searchInput.value.toLowerCase();
+      list.querySelectorAll(".product-picker-item").forEach(function(el) {
+        var nameEl = el.querySelector(".product-name");
+        var name = nameEl ? nameEl.textContent.toLowerCase() : "";
+        el.style.display = name.includes(query) ? "flex" : "none";
+      });
+    };
+  }
+}
+
+var BUNDLED_EXCLUDED_TYPES = ["BILL"];
+var _bundledSelectedTypes = [];
+
+function renderBundledDocOptions() {
+  var badgesEl = document.getElementById("bundledDocBadges");
+  if (!badgesEl) return;
+  var docTypeEl = document.getElementById("docTypeSelect");
+  var currentType = docTypeEl ? docTypeEl.value : "QUO";
+  // Remove current type from selections if user switched
+  _bundledSelectedTypes = _bundledSelectedTypes.filter(function(t) { return t !== currentType; });
+  var html = "";
+  for (var i = 0; i < _bundledSelectedTypes.length; i++) {
+    var t = _bundledSelectedTypes[i];
+    var cfg = DOC_CONFIG[t];
+    if (!cfg) continue;
+    html += '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;background:' + cfg.color + '14;color:' + cfg.color + ';border:1px solid ' + cfg.color + '30;">';
+    html += cfg.nameTH;
+    html += '<span class="bundled-remove-btn" data-type="' + t + '" style="cursor:pointer;margin-left:2px;opacity:.6;font-size:14px;line-height:1;" title="ลบ">&times;</span>';
+    html += '</span>';
+  }
+  badgesEl.innerHTML = html;
+  badgesEl.querySelectorAll(".bundled-remove-btn").forEach(function(btn) {
+    btn.onclick = function(e) {
+      e.stopPropagation();
+      var removeType = btn.dataset.type;
+      _bundledSelectedTypes = _bundledSelectedTypes.filter(function(t) { return t !== removeType; });
+      renderBundledDocOptions();
+    };
+  });
+}
+
+function openBundledDocPicker() {
+  var modal = document.getElementById("bundledDocPickerModal");
+  var grid = document.getElementById("bundledDocPickerGrid");
+  if (!modal || !grid) return;
+  var docTypeEl = document.getElementById("docTypeSelect");
+  var currentType = docTypeEl ? docTypeEl.value : "QUO";
+  var tempSelected = _bundledSelectedTypes.slice();
+  var types = Object.keys(DOC_CONFIG);
+  var html = "";
+  for (var i = 0; i < types.length; i++) {
+    var t = types[i];
+    if (t === currentType || BUNDLED_EXCLUDED_TYPES.indexOf(t) !== -1) continue;
+    var cfg = DOC_CONFIG[t];
+    var isSelected = tempSelected.indexOf(t) !== -1;
+    html += '<div class="bundled-picker-card" data-type="' + t + '" style="';
+    html += 'display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;border-radius:10px;';
+    html += 'border:2px solid ' + (isSelected ? cfg.color : '#e5e7eb') + ';';
+    html += 'background:' + (isSelected ? cfg.color + '0a' : '#fff') + ';';
+    html += 'cursor:pointer;transition:all .15s;text-align:center;">';
+    html += '<div style="width:36px;height:36px;border-radius:8px;background:' + cfg.color + '18;display:flex;align-items:center;justify-content:center;">';
+    html += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="' + cfg.color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+    html += '</div>';
+    html += '<span style="font-size:12px;font-weight:600;color:' + cfg.color + ';">' + cfg.nameTH + '</span>';
+    html += '<span style="font-size:10px;color:var(--color-muted);">' + cfg.nameEN + '</span>';
+    if (isSelected) {
+      html += '<svg width="16" height="16" viewBox="0 0 24 24" fill="' + cfg.color + '" stroke="#fff" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11.5 14.5 16 9.5"/></svg>';
+    }
+    html += '</div>';
+  }
+  grid.innerHTML = html;
+
+  grid.querySelectorAll(".bundled-picker-card").forEach(function(card) {
+    card.onclick = function() {
+      var ct = card.dataset.type;
+      var idx = tempSelected.indexOf(ct);
+      if (idx !== -1) { tempSelected.splice(idx, 1); } else { tempSelected.push(ct); }
+      // Re-render card state
+      var cfg = DOC_CONFIG[ct];
+      var sel = tempSelected.indexOf(ct) !== -1;
+      card.style.borderColor = sel ? cfg.color : '#e5e7eb';
+      card.style.background = sel ? cfg.color + '0a' : '#fff';
+      var checkSvg = card.querySelector("svg:last-child");
+      if (sel && !card.querySelector("[data-check]")) {
+        card.insertAdjacentHTML("beforeend", '<svg data-check width="16" height="16" viewBox="0 0 24 24" fill="' + cfg.color + '" stroke="#fff" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11.5 14.5 16 9.5"/></svg>');
+      } else if (!sel) {
+        var ck = card.querySelector("[data-check]");
+        if (ck) ck.remove();
+      }
+    };
+  });
+
+  // Store temp ref for confirm
+  modal._tempSelected = tempSelected;
+  modal.style.display = "flex";
+}
+
+function closeBundledDocPicker() {
+  var modal = document.getElementById("bundledDocPickerModal");
+  if (modal) modal.style.display = "none";
+}
+
+function confirmBundledDocPicker() {
+  var modal = document.getElementById("bundledDocPickerModal");
+  if (modal && modal._tempSelected) {
+    _bundledSelectedTypes = modal._tempSelected.slice();
+  }
+  closeBundledDocPicker();
+  renderBundledDocOptions();
+}
+
+function getCheckedBundledTypes() {
+  return _bundledSelectedTypes.slice();
+}
+
+function saveDocumentToHistory() {
+  var docTypeEl = document.getElementById("docTypeSelect");
+  var docNoEl = document.getElementById("docNoInput");
+  var docDateEl = document.getElementById("docDateInput");
+  var dueDateEl = document.getElementById("docDueDateInput");
+  var customerNameEl = document.getElementById("docCustomerName");
+  var noteEl = document.getElementById("docNote");
+  var subtotalEl = document.getElementById("docSubtotal");
+  var grandTotalEl = document.getElementById("docGrandTotal");
+  var customerTaxIdEl = document.getElementById("docCustomerTaxId");
+  var customerAddressEl = document.getElementById("docCustomerAddress");
+  var customerPhoneEl = document.getElementById("docCustomerPhone");
+  var customerEmailEl = document.getElementById("docCustomerEmail");
+
+  var spSelectEl = document.getElementById("docSalespersonSelect");
+  var spId = spSelectEl ? spSelectEl.value : "";
+  var spObj = (state.salespersons || []).find(function(s) { return s.entityId === spId; });
+  var spName = spObj ? spObj.name : "";
+
+  var docType = docTypeEl ? docTypeEl.value : "QUO";
+  var docNoRaw = docNoEl ? docNoEl.value : "";
+  var docNo = docState.docNoEdited ? docNoRaw : "";
+  var docDate = docDateEl ? docDateEl.value : "";
+  var dueDate = dueDateEl ? dueDateEl.value : "";
+  var customerName = customerNameEl ? customerNameEl.value : "";
+  var note = noteEl ? noteEl.value : "";
+  
+  var subtotalText = subtotalEl ? subtotalEl.textContent : "0";
+  var grandTotalText = grandTotalEl ? grandTotalEl.textContent : "0";
+  var subtotal = parseFloat(subtotalText.replace(/[^\d.-]/g, "")) || 0;
+  var grandTotal = parseFloat(grandTotalText.replace(/[^\d.-]/g, "")) || 0;
+
+  var afterDiscountEl = document.getElementById("docAfterDiscount");
+  var vatAmountEl = document.getElementById("docVatAmount");
+  var whtAmountEl = document.getElementById("docWhtAmount");
+  var itemDiscountEl = document.getElementById("docItemDiscount");
+  var totalDiscountEl = document.getElementById("docTotalDiscount");
+  var afterDiscount = afterDiscountEl ? parseFloat(afterDiscountEl.textContent.replace(/[^\d.-]/g, "")) || 0 : 0;
+  var vatAmount = vatAmountEl ? parseFloat(vatAmountEl.textContent.replace(/[^\d.-]/g, "")) || 0 : 0;
+  var whtAmount = whtAmountEl ? parseFloat(whtAmountEl.textContent.replace(/[^\d.-]/g, "")) || 0 : 0;
+  var itemDiscount = itemDiscountEl ? parseFloat(itemDiscountEl.textContent.replace(/[^\d.-]/g, "")) || 0 : 0;
+  var totalDiscount = totalDiscountEl ? parseFloat(totalDiscountEl.textContent.replace(/[^\d.-]/g, "")) || 0 : 0;
+  
+  var customerSelectEl = document.getElementById("docCustomerSelect");
+  var customerId = customerSelectEl ? customerSelectEl.value : "";
+  
+  var docOptVatEl = document.getElementById("docOptVat");
+  var docOptWhtEl = document.getElementById("docOptWht");
+  var docOptDiscountEl = document.getElementById("docOptDiscount");
+  var docVatRateEl = document.getElementById("docVatRate");
+  var docWhtRateEl = document.getElementById("docWhtRate");
+  var docDiscountValueEl = document.getElementById("docDiscountValue");
+  var docDiscountTypeEl = document.getElementById("docDiscountType");
+  var docOptSignEl = document.getElementById("docOptSign");
+
+  var vatEnabled = docOptVatEl ? docOptVatEl.checked : false;
+  var vatRate = docVatRateEl ? parseFloat(docVatRateEl.value) || 7 : 7;
+  var docOptVatIncEl = document.getElementById("docOptVatInc");
+  var vatInclusive = docOptVatIncEl ? docOptVatIncEl.checked : false;
+  var whtEnabled = docOptWhtEl ? docOptWhtEl.checked : false;
+  var whtRate = docWhtRateEl ? parseFloat(docWhtRateEl.value) || 3 : 3;
+  var docOptCustomFeeEl = document.getElementById("docOptCustomFee");
+  var customFeeEnabled = docOptCustomFeeEl ? docOptCustomFeeEl.checked : false;
+  var customFeeNameEl2 = document.getElementById("docCustomFeeName");
+  var customFeeName = customFeeNameEl2 ? customFeeNameEl2.value : "";
+  var customFeeAmountEl2 = document.getElementById("docCustomFeeAmount");
+  var customFeeAmount = customFeeAmountEl2 ? parseFloat(customFeeAmountEl2.value) || 0 : 0;
+  var discountEnabled = docOptDiscountEl ? docOptDiscountEl.checked : false;
+  var discountType = docDiscountTypeEl ? docDiscountTypeEl.value : "percent";
+  var discountValue = docDiscountValueEl ? parseFloat(docDiscountValueEl.value) || 0 : 0;
+  var signatureEnabled = docOptSignEl ? docOptSignEl.checked : true;
+
+  var docLangEl = document.getElementById("docLangSelect");
+  var docLang = docLangEl ? docLangEl.value : "th";
+
+  var docSignNameEl = document.getElementById("docSignName");
+  var signatureName = docSignNameEl ? docSignNameEl.value.trim() : "";
+  var signatureImage = docState.signatureImage || "";
+  var docSignDateEl = document.getElementById("docSignDate");
+  var signatureDate = docSignDateEl ? docSignDateEl.value : "";
+
+  var docOptStampEl = document.getElementById("docOptStamp");
+  var stampEnabled = docOptStampEl ? docOptStampEl.checked : false;
+  var stampSourceLogoEl = document.getElementById("stampSourceLogo");
+  var stampSource = (stampSourceLogoEl && stampSourceLogoEl.checked) ? "logo" : "custom";
+  var stampImage = docState.stampImage || "";
+
+  var termsTextEl = document.getElementById("docTermsText");
+  var termsText = termsTextEl ? termsTextEl.value : "";
+  var docOptTermsEl = document.getElementById("docOptTerms");
+  var showTermsAndConditions = docOptTermsEl ? docOptTermsEl.checked : true;
+
+  var paymentTermsSelectEl = document.getElementById("docPaymentTerms");
+  var paymentTerms = paymentTermsSelectEl ? paymentTermsSelectEl.value : "";
+  var paymentTermsCustomEl = document.getElementById("docPaymentTermsCustom");
+  var paymentTermsCustom = paymentTermsCustomEl ? paymentTermsCustomEl.value : "";
+  var docOptPaymentTermsEl = document.getElementById("docOptPaymentTerms");
+  var showPaymentTerms = docOptPaymentTermsEl ? docOptPaymentTermsEl.checked : false;
+  var paymentTermsLabel = "";
+  if (paymentTerms === "custom" && paymentTermsCustom) {
+    paymentTermsLabel = paymentTermsCustom;
+  } else if (paymentTermsSelectEl && paymentTermsSelectEl.selectedIndex >= 0) {
+    paymentTermsLabel = paymentTermsSelectEl.options[paymentTermsSelectEl.selectedIndex].textContent || paymentTerms;
+  }
+
+  var documentData = {
+    companyId: state.companyId,
+    customerId: customerId,
+    type: docType,
+    docNo: docNo,
+    docDate: docDate,
+    dueDate: dueDate,
+    paymentStatus: (docType === "RCPT") ? "PAID" : "UNPAID",
+    status: "draft",
+    vatEnabled: vatEnabled,
+    vatRate: vatRate,
+    whtEnabled: whtEnabled,
+    whtRate: whtRate,
+    discountEnabled: discountEnabled,
+    discountType: discountType,
+    discountValue: discountValue,
+    signatureEnabled: signatureEnabled,
+    terms: termsText,
+    json: {
+      customerName: customerName,
+      customerTaxId: customerTaxIdEl ? customerTaxIdEl.value : "",
+      customerAddress: customerAddressEl ? customerAddressEl.value : "",
+      customerPhone: customerPhoneEl ? customerPhoneEl.value : "",
+      customerEmail: customerEmailEl ? customerEmailEl.value : "",
+      note: note,
+      items: docState.items || [],
+      itemMode: isBillMode() ? "bill" : (docState.itemMode || "product"),
+      subtotal: subtotal,
+      grandTotal: grandTotal,
+      afterDiscount: afterDiscount,
+      vatAmount: vatAmount,
+      whtAmount: whtAmount,
+      itemDiscount: itemDiscount,
+      totalDiscount: totalDiscount,
+      discountEnabled: discountEnabled,
+      discountType: discountType,
+      discountValue: discountValue,
+      vatEnabled: vatEnabled,
+      vatRate: vatRate,
+      vatInclusive: vatInclusive,
+      whtEnabled: whtEnabled,
+      whtRate: whtRate,
+      customFeeEnabled: customFeeEnabled,
+      customFeeName: customFeeName,
+      customFeeAmount: customFeeAmount,
+      signatureEnabled: signatureEnabled,
+      signatureName: signatureName,
+      signatureImage: signatureImage,
+      signatureDate: signatureDate,
+      stampEnabled: stampEnabled,
+      stampSource: stampSource,
+      stampImage: stampImage,
+      termsText: termsText,
+      showTermsAndConditions: showTermsAndConditions,
+      showPaymentTerms: showPaymentTerms,
+      paymentTerms: paymentTerms,
+      paymentTermsCustom: paymentTermsCustom,
+      paymentTermsLabel: paymentTermsLabel,
+      docLang: docLang,
+      showDetail: document.getElementById("docOptDetail") ? document.getElementById("docOptDetail").checked !== false : true,
+      salespersonId: spId,
+      salespersonName: spName,
+      contactPerson: (function() { var el = document.getElementById("docContactSelect"); return el ? el.value : ""; })()
+    }
+  };
+
+  // Ensure images are uploaded to Drive (fallback if background upload hasn't finished)
+  var imgUploads = [];
+  if (signatureImage && signatureImage.indexOf("data:") === 0) {
+    imgUploads.push(
+      runServer("uploadCompanyLogoApi", state.companyId, signatureImage, null, "signature_" + Date.now() + ".png")
+        .then(function(res) {
+          if (res && res.url) {
+            documentData.json.signatureImage = res.url;
+          }
+        }).catch(function(e) { console.error("Upload signature error:", e); })
+    );
+  }
+  if (stampImage && stampImage.indexOf("data:") === 0) {
+    imgUploads.push(
+      runServer("uploadCompanyLogoApi", state.companyId, stampImage, null, "stamp_" + Date.now() + ".png")
+        .then(function(res) {
+          if (res && res.url) {
+            documentData.json.stampImage = res.url;
+            docState.stampImage = res.url;
+          }
+        }).catch(function(e) { console.error("Upload stamp error:", e); })
+    );
+  }
+
+  return Promise.all(imgUploads).then(function() {
+
+  var bundledTypes = getCheckedBundledTypes();
+  var allTypes = [docType].concat(bundledTypes);
+
+  if (bundledTypes.length > 0) {
+    var docIds = [];
+    var chain = Promise.resolve();
+    for (var bi = 0; bi < allTypes.length; bi++) {
+      (function(bType, isFirst) {
+        chain = chain.then(function() {
+          var bData = JSON.parse(JSON.stringify(documentData));
+          bData.type = bType;
+          bData.docType = bType;
+          if (!isFirst) bData.docNo = ""; // auto-generate for bundled
+          return runServer("saveDocument", bData).then(function(result) {
+            if (result && result.header) docIds.push(result.header.docId);
+          });
+        });
+      })(allTypes[bi], bi === 0);
+    }
+    return chain
+      .then(function() {
+        showToast("บันทึกเอกสาร " + docIds.length + " รายการเรียบร้อยแล้ว", { type: "success" });
+        docState.docNoEdited = false;
+        return refreshAll().then(function() {
+          if (typeof loadDocHistory === "function") loadDocHistory();
+          if (typeof loadPayments === "function") loadPayments();
+          if (docIds.length && typeof navigateToDocHistoryAndSelect === "function") {
+            navigateToDocHistoryAndSelect(docIds);
+          }
+        });
+      })
+      .catch(function(error) {
+        console.error("Save bundled documents error:", error);
+        showToast((error.message || error), { type: "error", title: "บันทึกไม่สำเร็จ" });
+        throw error;
+      });
+  }
+
+  return runServer("saveDocument", documentData)
+    .then(function(result) {
+      showToast("บันทึกเอกสารเรียบร้อยแล้ว", { type: "success" });
+      docState.docNoEdited = false;
+      var newDocId = result && result.header ? result.header.docId : "";
+      return refreshAll().then(function() {
+        if (typeof loadDocHistory === "function") loadDocHistory();
+        if (typeof loadPayments === "function") loadPayments();
+        if (newDocId && typeof navigateToDocHistoryAndSelect === "function") {
+          navigateToDocHistoryAndSelect(newDocId);
+        }
+      });
+    })
+    .catch(function(error) {
+      console.error("Save document error:", error);
+      showToast((error.message || error), { type: "error", title: "บันทึกไม่สำเร็จ" });
+      throw error;
+    });
+
+  }); // end Promise.all(imgUploads)
+}
+
+// ===== Preset System =====
+
+var PRESET_CHIP_STYLE = 'display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:16px;font-size:12px;cursor:pointer;border:1px solid var(--color-border);background:#fff;transition:all .15s;';
+var PRESET_ADD_STYLE = 'display:inline-flex;align-items:center;gap:3px;padding:4px 10px;border-radius:16px;font-size:12px;cursor:pointer;border:1px dashed var(--color-border);background:#fafafa;color:var(--color-muted);';
+
+function _getPresets(key) {
+  try { return JSON.parse(state.settings[key] || "[]"); } catch(e) { return []; }
+}
+
+function _savePresets(key, presets, cb) {
+  var json = JSON.stringify(presets);
+  var obj = {}; obj[key] = json;
+  google.script.run
+    .withSuccessHandler(function() { state.settings[key] = json; if (cb) cb(); })
+    .withFailureHandler(function(err) { showToast(err.message, { type: "error" }); })
+    .updateUserSettings(obj);
+}
+
+// ===== Preset Save Dialog =====
+
+var _presetDialogCallback = null;
+
+function openPresetSaveDialog(title, callback) {
+  _presetDialogCallback = callback;
+  var dlg = document.getElementById("presetSaveDialog");
+  var titleEl = document.getElementById("presetSaveDialogTitle");
+  var nameEl = document.getElementById("presetSaveDialogName");
+  var noteEl = document.getElementById("presetSaveDialogNote");
+  var confirmBtn = document.getElementById("presetSaveDialogConfirm");
+  if (titleEl) titleEl.textContent = title;
+  if (nameEl) { nameEl.value = ""; nameEl.style.borderColor = ""; }
+  if (noteEl) noteEl.value = "";
+  if (dlg) dlg.style.display = "flex";
+  if (nameEl) setTimeout(function() { nameEl.focus(); }, 50);
+  if (confirmBtn) {
+    confirmBtn.onclick = function() {
+      var name = (nameEl ? nameEl.value.trim() : "");
+      if (!name) { if (nameEl) nameEl.style.borderColor = "#ef4444"; return; }
+      var note = noteEl ? noteEl.value.trim() : "";
+      var cb = _presetDialogCallback;
+      closePresetSaveDialog();
+      if (cb) cb(name, note);
+    };
+  }
+}
+
+function closePresetSaveDialog() {
+  var dlg = document.getElementById("presetSaveDialog");
+  if (dlg) dlg.style.display = "none";
+  _presetDialogCallback = null;
+}
+
+function _chipHtml(name, note, applyFn, deleteFn) {
+  var tooltip = name + (note ? "\n" + note : "");
+  var html = '<span class="preset-chip" style="' + PRESET_CHIP_STYLE + '" onclick="' + applyFn + '" title="' + tooltip.replace(/"/g, '&quot;') + '">';
+  html += '<span>' + (name || 'ชุด') + '</span>';
+  html += '<span onclick="event.stopPropagation();' + deleteFn + '" style="margin-left:2px;color:#9ca3af;cursor:pointer;line-height:1;" title="ลบ">&times;</span>';
+  html += '</span>';
+  return html;
+}
+
+function _addBtnHtml(onclickFn, label) {
+  return '<span style="' + PRESET_ADD_STYLE + '" onclick="' + onclickFn + '">' +
+    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/></svg> ' + label + '</span>';
+}
+
+// ===== Terms Presets =====
+
+function renderTermsPresets() {
+  var bar = document.getElementById("termsPresetsBar");
+  if (!bar) return;
+  var presets = _getPresets("doc.termsPresets");
+  var html = '';
+  presets.forEach(function(p, i) {
+    html += _chipHtml(p.name, p.note, 'applyTermsPreset(' + i + ')', 'deleteTermsPreset(' + i + ')');
+  });
+  html += _addBtnHtml('promptSaveTermsPreset()', 'บันทึก');
+  bar.innerHTML = html;
+}
+
+function applyTermsPreset(index) {
+  var presets = _getPresets("doc.termsPresets");
+  var p = presets[index]; if (!p) return;
+  var termsText = document.getElementById("docTermsText");
+  var paymentTerms = document.getElementById("docPaymentTerms");
+  var paymentTermsCustom = document.getElementById("docPaymentTermsCustom");
+  var optPaymentTerms = document.getElementById("docOptPaymentTerms");
+  var optTerms = document.getElementById("docOptTerms");
+  var docTermsTextWrapper = document.getElementById("docTermsTextWrapper");
+  if (termsText && p.termsText !== undefined) termsText.value = p.termsText;
+  if (paymentTerms && p.paymentTerms) {
+    paymentTerms.value = p.paymentTerms;
+    if (paymentTermsCustom) paymentTermsCustom.style.display = paymentTerms.value === "custom" ? "block" : "none";
+  }
+  if (paymentTermsCustom && p.paymentTermsCustom) paymentTermsCustom.value = p.paymentTermsCustom;
+  if (optPaymentTerms && p.showPaymentTerms !== undefined) optPaymentTerms.checked = p.showPaymentTerms;
+  if (optTerms && p.showTerms !== undefined) {
+    optTerms.checked = p.showTerms;
+    if (docTermsTextWrapper) docTermsTextWrapper.style.display = optTerms.checked ? "block" : "none";
+  }
+  showToast('ใช้เงื่อนไข "' + (p.name || '') + '"', { type: "success" });
+}
+
+function promptSaveTermsPreset() {
+  var presets = _getPresets("doc.termsPresets");
+  if (presets.length >= 5) { showToast("บันทึกได้สูงสุด 5 ชุด", { type: "warning" }); return; }
+  openPresetSaveDialog("บันทึกเงื่อนไขและข้อกำหนด", function(name, note) {
+    var termsText = document.getElementById("docTermsText");
+    var paymentTerms = document.getElementById("docPaymentTerms");
+    var paymentTermsCustom = document.getElementById("docPaymentTermsCustom");
+    var optPaymentTerms = document.getElementById("docOptPaymentTerms");
+    var optTerms = document.getElementById("docOptTerms");
+    var preset = {
+      name: name,
+      note: note,
+      termsText: termsText ? termsText.value : "",
+      paymentTerms: paymentTerms ? paymentTerms.value : "credit30",
+      paymentTermsCustom: paymentTermsCustom ? paymentTermsCustom.value : "",
+      showPaymentTerms: optPaymentTerms ? optPaymentTerms.checked : true,
+      showTerms: optTerms ? optTerms.checked : true
+    };
+    var list = _getPresets("doc.termsPresets");
+    list.push(preset);
+    _savePresets("doc.termsPresets", list, function() {
+      renderTermsPresets();
+      showToast('บันทึกเงื่อนไข "' + name + '"', { type: "success" });
+    });
+  });
+}
+
+function deleteTermsPreset(index) {
+  var presets = _getPresets("doc.termsPresets");
+  var name = presets[index] ? presets[index].name : "";
+  if (!confirm('ลบเงื่อนไข "' + name + '" ?')) return;
+  presets.splice(index, 1);
+  _savePresets("doc.termsPresets", presets, function() {
+    renderTermsPresets();
+    showToast("ลบเรียบร้อย", { type: "success" });
+  });
+}
+
+// ===== Sign Presets =====
+
+function renderSignPresets() {
+  var bar = document.getElementById("signPresetsBar");
+  if (!bar) return;
+  var presets = _getPresets("doc.signPresets");
+  var html = '';
+  presets.forEach(function(p, i) {
+    html += _chipHtml(p.name, p.note, 'applySignPreset(' + i + ')', 'deleteSignPreset(' + i + ')');
+  });
+  html += _addBtnHtml('promptSaveSignPreset()', 'บันทึก');
+  bar.innerHTML = html;
+}
+
+function applySignPreset(index) {
+  var presets = _getPresets("doc.signPresets");
+  var p = presets[index]; if (!p) return;
+  var optSign = document.getElementById("docOptSign");
+  var signName = document.getElementById("docSignName");
+  var docSignatureSection = document.getElementById("docSignatureSection");
+
+  if (optSign) {
+    optSign.checked = true;
+    if (docSignatureSection) docSignatureSection.style.display = "block";
+  }
+  if (signName && p.signName) signName.value = p.signName;
+
+  if (p.signImageUrl) {
+    var signPreview = document.getElementById("docSignPreview");
+    var btnRemoveSign = document.getElementById("btnRemoveSign");
+    if (signPreview) signPreview.innerHTML = '<img src="' + p.signImageUrl + '" style="max-width:100%;max-height:100%;object-fit:contain;" />';
+    if (btnRemoveSign) btnRemoveSign.style.display = "block";
+    runServer("fetchImageBase64Api", p.signImageUrl).then(function(b64) {
+      if (b64) docState.signatureImage = b64;
+    }).catch(function() {});
+  }
+
+  showToast('ใช้ลายเซ็น "' + (p.name || '') + '"', { type: "success" });
+}
+
+function promptSaveSignPreset() {
+  var presets = _getPresets("doc.signPresets");
+  if (presets.length >= 5) { showToast("บันทึกได้สูงสุด 5 ชุด", { type: "warning" }); return; }
+  openPresetSaveDialog("บันทึกลายเซ็น", function(name, note) {
+    var signName = document.getElementById("docSignName");
+    var preset = {
+      name: name,
+      note: note,
+      signName: signName ? signName.value.trim() : ""
+    };
+    var signPromise = Promise.resolve("");
+    if (docState.signatureImage && docState.signatureImage.indexOf("data:") === 0) {
+      signPromise = runServer("uploadCompanyLogoApi", state.companyId, docState.signatureImage, null, "signature_" + Date.now() + ".png")
+        .then(function(res) { return res.url || ""; }).catch(function() { return ""; });
+    }
+    showToast("กำลังบันทึก...", { type: "info" });
+    signPromise.then(function(signUrl) {
+      if (signUrl) preset.signImageUrl = signUrl;
+      var list = _getPresets("doc.signPresets");
+      list.push(preset);
+      _savePresets("doc.signPresets", list, function() {
+        renderSignPresets();
+        showToast('บันทึกลายเซ็น "' + name + '"', { type: "success" });
+      });
+    });
+  });
+}
+
+function deleteSignPreset(index) {
+  var presets = _getPresets("doc.signPresets");
+  var name = presets[index] ? presets[index].name : "";
+  if (!confirm('ลบลายเซ็น "' + name + '" ?')) return;
+  presets.splice(index, 1);
+  _savePresets("doc.signPresets", presets, function() {
+    renderSignPresets();
+    showToast("ลบเรียบร้อย", { type: "success" });
+  });
+}
+
+// ===== Stamp Presets =====
+
+function renderStampPresets() {
+  var bar = document.getElementById("stampPresetsBar");
+  if (!bar) return;
+  var presets = _getPresets("doc.stampPresets");
+  var html = '';
+  presets.forEach(function(p, i) {
+    html += _chipHtml(p.name, p.note, 'applyStampPreset(' + i + ')', 'deleteStampPreset(' + i + ')');
+  });
+  html += _addBtnHtml('promptSaveStampPreset()', 'บันทึก');
+  bar.innerHTML = html;
+}
+
+function applyStampPreset(index) {
+  var presets = _getPresets("doc.stampPresets");
+  var p = presets[index]; if (!p) return;
+  var optStamp = document.getElementById("docOptStamp");
+  var docStampSection = document.getElementById("docStampSection");
+  var stampSourceLogo = document.getElementById("stampSourceLogo");
+  var stampSourceCustom = document.getElementById("stampSourceCustom");
+  var docStampUploadWrap = document.getElementById("docStampUploadWrap");
+  var preview = document.getElementById("docStampPreview");
+  var btnRemoveStamp = document.getElementById("btnRemoveStamp");
+
+  if (optStamp) {
+    optStamp.checked = true;
+    if (docStampSection) docStampSection.style.display = "block";
+  }
+  if (p.stampSource && stampSourceLogo && stampSourceCustom) {
+    if (p.stampSource === "custom") { stampSourceCustom.checked = true; if (docStampUploadWrap) docStampUploadWrap.style.display = "block"; }
+    else { stampSourceLogo.checked = true; if (docStampUploadWrap) docStampUploadWrap.style.display = "none"; }
+  }
+  if (p.stampSource === "custom" && p.stampImageUrl) {
+    if (preview) preview.innerHTML = '<span style="font-size: 11px; color: #9ca3af;">กำลังโหลด...</span>';
+    convertToGrayscale(p.stampImageUrl, function(graySrc) {
+      docState.stampImage = graySrc;
+      if (preview) preview.innerHTML = '<img src="' + graySrc + '" style="max-width: 100%; max-height: 100%; object-fit: contain;" />';
+      if (btnRemoveStamp) btnRemoveStamp.style.display = "block";
+    });
+  } else if (typeof updateStampPreview === "function") {
+    setTimeout(function() { updateStampPreview(); }, 100);
+  }
+
+  showToast('ใช้ตราประทับ "' + (p.name || '') + '"', { type: "success" });
+}
+
+function promptSaveStampPreset() {
+  var presets = _getPresets("doc.stampPresets");
+  if (presets.length >= 5) { showToast("บันทึกได้สูงสุด 5 ชุด", { type: "warning" }); return; }
+  openPresetSaveDialog("บันทึกตราประทับ", function(name, note) {
+    var stampSourceLogo = document.getElementById("stampSourceLogo");
+    var isCustom = !(stampSourceLogo && stampSourceLogo.checked);
+    var preset = {
+      name: name,
+      note: note,
+      stampSource: isCustom ? "custom" : "logo"
+    };
+    var uploadPromise = Promise.resolve("");
+    if (isCustom && docState.stampImage && docState.stampImage.indexOf("data:") === 0) {
+      uploadPromise = runServer("uploadCompanyLogoApi", state.companyId, docState.stampImage, null, "stamp_" + Date.now() + ".png")
+        .then(function(res) { return res.url || ""; }).catch(function() { return ""; });
+    }
+    showToast("กำลังบันทึก...", { type: "info" });
+    uploadPromise.then(function(stampUrl) {
+      if (stampUrl) preset.stampImageUrl = stampUrl;
+      var list = _getPresets("doc.stampPresets");
+      list.push(preset);
+      _savePresets("doc.stampPresets", list, function() {
+        renderStampPresets();
+        showToast('บันทึกตราประทับ "' + name + '"', { type: "success" });
+      });
+    });
+  });
+}
+
+function deleteStampPreset(index) {
+  var presets = _getPresets("doc.stampPresets");
+  var name = presets[index] ? presets[index].name : "";
+  if (!confirm('ลบตราประทับ "' + name + '" ?')) return;
+  presets.splice(index, 1);
+  _savePresets("doc.stampPresets", presets, function() {
+    renderStampPresets();
+    showToast("ลบเรียบร้อย", { type: "success" });
+  });
+}
+
+// ===== Note Presets =====
+
+function renderNotePresets() {
+  var bar = document.getElementById("notePresetsBar");
+  if (!bar) return;
+  var presets = _getPresets("doc.notePresets");
+  var html = '';
+  presets.forEach(function(p, i) {
+    html += _chipHtml(p.name, p.note, 'applyNotePreset(' + i + ')', 'deleteNotePreset(' + i + ')');
+  });
+  html += _addBtnHtml('promptSaveNotePreset()', 'บันทึก');
+  bar.innerHTML = html;
+}
+
+function applyNotePreset(index) {
+  var presets = _getPresets("doc.notePresets");
+  var p = presets[index]; if (!p) return;
+  var docNote = document.getElementById("docNote");
+  if (docNote && p.text !== undefined) docNote.value = p.text;
+  showToast('ใช้หมายเหตุ "' + (p.name || '') + '"', { type: "success" });
+}
+
+function promptSaveNotePreset() {
+  var presets = _getPresets("doc.notePresets");
+  if (presets.length >= 5) { showToast("บันทึกได้สูงสุด 5 ชุด", { type: "warning" }); return; }
+  openPresetSaveDialog("บันทึกหมายเหตุ", function(name, note) {
+    var docNote = document.getElementById("docNote");
+    var preset = {
+      name: name,
+      note: note,
+      text: docNote ? docNote.value : ""
+    };
+    var list = _getPresets("doc.notePresets");
+    list.push(preset);
+    _savePresets("doc.notePresets", list, function() {
+      renderNotePresets();
+      showToast('บันทึกหมายเหตุ "' + name + '"', { type: "success" });
+    });
+  });
+}
+
+function deleteNotePreset(index) {
+  var presets = _getPresets("doc.notePresets");
+  var name = presets[index] ? presets[index].name : "";
+  if (!confirm('ลบหมายเหตุ "' + name + '" ?')) return;
+  presets.splice(index, 1);
+  _savePresets("doc.notePresets", presets, function() {
+    renderNotePresets();
+    showToast("ลบเรียบร้อย", { type: "success" });
+  });
+}
+
+// ===== Item Presets =====
+
+function renderItemPresets() {
+  var bar = document.getElementById("itemPresetsBar");
+  if (!bar) return;
+  var presets = _getPresets("doc.itemPresets");
+  var html = '';
+  presets.forEach(function(p, i) {
+    var countLabel = p.items ? p.items.length + " รายการ" : "";
+    html += _chipHtml(p.name, (p.note ? p.note + "\n" : "") + countLabel, 'applyItemPreset(' + i + ')', 'deleteItemPreset(' + i + ')');
+  });
+  html += _addBtnHtml('promptSaveItemPreset()', 'บันทึก');
+  bar.innerHTML = html;
+}
+
+function applyItemPreset(index) {
+  var presets = _getPresets("doc.itemPresets");
+  var p = presets[index]; if (!p || !p.items || !p.items.length) return;
+  // Replace items instead of appending
+  docState.items = [];
+  docState.nextItemId = 1;
+  p.items.forEach(function(src) {
+    var item = {
+      id: docState.nextItemId++,
+      productId: src.productId || "",
+      name: src.name || "",
+      qty: Number(src.qty) || 1,
+      unit: src.unit || "",
+      price: Number(src.price) || 0,
+      discount: 0,
+      discountType: "amount",
+      details: src.details || ""
+    };
+    docState.items.push(item);
+  });
+  // Restore itemMode if saved
+  var modeEl = document.getElementById("docItemMode");
+  if (p.itemMode) {
+    docState.itemMode = p.itemMode;
+    if (modeEl) modeEl.value = p.itemMode;
+  }
+  renderDocItems();
+  recalculateDocTotals();
+  showToast('โหลด ' + p.items.length + ' รายการจาก "' + (p.name || '') + '"', { type: "success" });
+}
+
+function promptSaveItemPreset() {
+  if (!docState.items || !docState.items.length) {
+    showToast("ไม่มีรายการสินค้าให้บันทึก", { type: "warning" });
+    return;
+  }
+  var presets = _getPresets("doc.itemPresets");
+  if (presets.length >= 5) { showToast("บันทึกได้สูงสุด 5 ชุด", { type: "warning" }); return; }
+  openPresetSaveDialog("บันทึกชุดรายการสินค้า", function(name, note) {
+    var items = docState.items.map(function(item) {
+      return {
+        productId: item.productId || "",
+        name: item.name || "",
+        qty: item.qty || 1,
+        unit: item.unit || "",
+        price: item.price || 0,
+        details: item.details || ""
+      };
+    });
+    var modeEl = document.getElementById("docItemMode");
+    var preset = { name: name, note: note, items: items, itemMode: modeEl ? modeEl.value : "product" };
+    var list = _getPresets("doc.itemPresets");
+    list.push(preset);
+    _savePresets("doc.itemPresets", list, function() {
+      renderItemPresets();
+      showToast('บันทึกชุดรายการ "' + name + '" (' + items.length + ' รายการ)', { type: "success" });
+    });
+  });
+}
+
+function deleteItemPreset(index) {
+  var presets = _getPresets("doc.itemPresets");
+  var name = presets[index] ? presets[index].name : "";
+  if (!confirm('ลบชุดรายการ "' + name + '" ?')) return;
+  presets.splice(index, 1);
+  _savePresets("doc.itemPresets", presets, function() {
+    renderItemPresets();
+    showToast("ลบเรียบร้อย", { type: "success" });
+  });
+}
+
+// ===== Prefill Document as Receipt =====
+
+function prefillDocumentAsReceipt(doc) {
+  if (!doc) return;
+  if (typeof doc.json === "string") {
+    try { doc.json = JSON.parse(doc.json); } catch(e) { doc.json = {}; }
+  }
+  var json = doc.json || {};
+  var today = new Date().toISOString().slice(0, 10);
+
+  // Navigate to document page
+  setView("documents");
+
+  // Set doc type to RCPT
+  var docTypeSelect = document.getElementById("docTypeSelect");
+  if (docTypeSelect) {
+    docTypeSelect.value = "RCPT";
+    docState.docNoEdited = false;
+    updateDocTypeFields("RCPT");
+  }
+
+  // Set dates
+  var docDateInput = document.getElementById("docDateInput");
+  if (docDateInput) docDateInput.value = today;
+  var dueDateInput = document.getElementById("docDueDateInput");
+  if (dueDateInput) dueDateInput.value = today;
+
+  // Fill customer info
+  var customerSelectEl = document.getElementById("docCustomerSelect");
+  if (customerSelectEl && doc.customerId) {
+    customerSelectEl.value = doc.customerId;
+    customerSelectEl.dispatchEvent(new Event("change"));
+  }
+  var nameEl = document.getElementById("docCustomerName");
+  if (nameEl) nameEl.value = json.customerName || "";
+  var taxIdEl = document.getElementById("docCustomerTaxId");
+  if (taxIdEl) taxIdEl.value = json.customerTaxId || "";
+  var addressEl = document.getElementById("docCustomerAddress");
+  if (addressEl) addressEl.value = json.customerAddress || "";
+  var phoneEl = document.getElementById("docCustomerPhone");
+  if (phoneEl) phoneEl.value = json.customerPhone || "";
+  var emailEl = document.getElementById("docCustomerEmail");
+  if (emailEl) emailEl.value = json.customerEmail || "";
+
+  // Set item mode
+  var itemModeEl = document.getElementById("docItemMode");
+  if (itemModeEl && json.itemMode) {
+    itemModeEl.value = json.itemMode;
+    docState.itemMode = json.itemMode;
+  }
+
+  // Load items
+  docState.items = [];
+  docState.nextItemId = 1;
+  var items = json.items || [];
+  items.forEach(function(src) {
+    docState.items.push({
+      id: docState.nextItemId++,
+      productId: src.productId || "",
+      name: src.name || "",
+      qty: Number(src.qty) || 1,
+      unit: src.unit || "",
+      price: Number(src.price) || 0,
+      discount: Number(src.discount) || 0,
+      discountType: src.discountType || "amount",
+      details: src.details || ""
+    });
+  });
+  renderDocItems();
+
+  // Set financial options
+  var docOptDiscount = document.getElementById("docOptDiscount");
+  var docDiscountSection = document.getElementById("docDiscountSection");
+  var docTotalDiscountRow = document.getElementById("docTotalDiscountRow");
+  if (docOptDiscount) {
+    docOptDiscount.checked = !!json.discountEnabled;
+    if (docDiscountSection) docDiscountSection.style.display = json.discountEnabled ? "block" : "none";
+    if (docTotalDiscountRow) docTotalDiscountRow.style.display = json.discountEnabled ? "flex" : "none";
+  }
+  var discountValueEl = document.getElementById("docDiscountValue");
+  if (discountValueEl) discountValueEl.value = json.discountValue || 0;
+  var discountTypeEl = document.getElementById("docDiscountType");
+  if (discountTypeEl) discountTypeEl.value = json.discountType || "percent";
+
+  var docOptVat = document.getElementById("docOptVat");
+  var docVatSection = document.getElementById("docVatSection");
+  var docVatRow = document.getElementById("docVatRow");
+  if (docOptVat) {
+    docOptVat.checked = !!json.vatEnabled;
+    if (docVatSection) docVatSection.style.display = json.vatEnabled ? "block" : "none";
+    if (docVatRow) docVatRow.style.display = json.vatEnabled ? "flex" : "none";
+  }
+  var vatRateEl = document.getElementById("docVatRate");
+  if (vatRateEl) vatRateEl.value = json.vatRate || 7;
+  var docOptVatInc = document.getElementById("docOptVatInc");
+  if (docOptVatInc) docOptVatInc.checked = !!json.vatInclusive;
+
+  var docOptWht = document.getElementById("docOptWht");
+  var docWhtSection = document.getElementById("docWhtSection");
+  var docWhtRow = document.getElementById("docWhtRow");
+  if (docOptWht) {
+    docOptWht.checked = !!json.whtEnabled;
+    if (docWhtSection) docWhtSection.style.display = json.whtEnabled ? "block" : "none";
+    if (docWhtRow) docWhtRow.style.display = json.whtEnabled ? "flex" : "none";
+  }
+  var whtRateEl = document.getElementById("docWhtRate");
+  if (whtRateEl) whtRateEl.value = json.whtRate || 3;
+
+  var docOptCustomFee = document.getElementById("docOptCustomFee");
+  var docCustomFeeSection = document.getElementById("docCustomFeeSection");
+  var docCustomFeeRow = document.getElementById("docCustomFeeRow");
+  if (docOptCustomFee) {
+    docOptCustomFee.checked = !!json.customFeeEnabled;
+    if (docCustomFeeSection) docCustomFeeSection.style.display = json.customFeeEnabled ? "block" : "none";
+    if (docCustomFeeRow) docCustomFeeRow.style.display = json.customFeeEnabled ? "flex" : "none";
+  }
+  var customFeeNameEl = document.getElementById("docCustomFeeName");
+  if (customFeeNameEl) customFeeNameEl.value = json.customFeeName || "";
+  var customFeeAmountEl = document.getElementById("docCustomFeeAmount");
+  if (customFeeAmountEl) customFeeAmountEl.value = json.customFeeAmount || 0;
+
+  // Set note with reference
+  var noteEl2 = document.getElementById("docNote");
+  if (noteEl2) noteEl2.value = json.note || "";
+
+  // Set refDocNo
+  docState.refDocNo = doc.docNo || "";
+
+  // Recalculate totals
+  recalculateDocTotals();
+
+  // Render presets
+  renderItemPresets();
+  renderBundledDocOptions();
+
+  showToast("กรอกข้อมูลจาก " + (doc.docNo || "เอกสารต้นฉบับ") + " เรียบร้อย", { type: "success" });
+}
+
+// ===== Document Language =====
+
+function initDocLangSelect() {
+  var el = document.getElementById("docLangSelect");
+  if (!el) return;
+  var defaultLang = (state.settings || {})["doc.language"] || "th";
+  el.value = defaultLang;
+}
+</script>

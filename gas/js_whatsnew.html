@@ -1,0 +1,95 @@
+<script>
+// ===== What's New Popup =====
+// เปลี่ยน APP_VERSION ทุกครั้งที่มีอัพเดทใหญ่ แล้วแก้ WHATS_NEW_ITEMS
+var APP_VERSION = "1.8.0";
+
+var WHATS_NEW_ITEMS = [
+  {
+    icon: "�",
+    title: "หน้าแดชบอร์ดรูปแบบใหม่",
+    desc: "สรุปข้อมูลยอดขาย ลูกค้าชำระเงินสูงสุด สินค้าขายดี พร้อมกราฟวิเคราะห์และตัวกรองช่วงเวลาที่ใช้งานง่ายขึ้น"
+  },
+  {
+    icon: "🎨",
+    title: "ปรับแต่งสีเอกสารได้",
+    desc: "สามารถเลือกสีธีมของเอกสารแต่ละใบได้ตามต้องการที่หน้าสร้าง/แก้ไขเอกสาร"
+  },
+  {
+    icon: "�",
+    title: "เพิ่มรายการได้มากขึ้นใน 1 หน้า",
+    desc: "ปรับปรุงรูปแบบเอกสาร PDF ให้สามารถรองรับจำนวนรายการสินค้าในหน้าแรกได้มากขึ้น"
+  },
+  {
+    icon: "�",
+    title: "แก้ไขบัคและปรับปรุงระบบ",
+    desc: "แก้ไขปัญหาการอัปโหลดลายเซ็นและบัคการรันเลขที่เอกสารซ้ำให้ทำงานได้อย่างถูกต้อง"
+  }
+];
+
+function checkWhatsNew() {
+  // Use server-side settings (loaded in bootstrap) to check seen version
+  var seenVersion = (state.settings && state.settings["app.whatsNewSeen"]) || "";
+  if (seenVersion === APP_VERSION) return;
+  // Delay a bit so the app loads first
+  setTimeout(showWhatsNewPopup, 800);
+}
+
+function showWhatsNewPopup() {
+  // Build items HTML
+  var itemsHtml = "";
+  for (var i = 0; i < WHATS_NEW_ITEMS.length; i++) {
+    var item = WHATS_NEW_ITEMS[i];
+    itemsHtml += '<div class="whatsnew-item">'
+      + '<div class="whatsnew-icon">' + item.icon + '</div>'
+      + '<div class="whatsnew-text">'
+      + '<div class="whatsnew-title">' + item.title + '</div>'
+      + '<div class="whatsnew-desc">' + item.desc + '</div>'
+      + '</div></div>';
+  }
+
+  var overlay = document.createElement("div");
+  overlay.id = "whatsNewOverlay";
+  overlay.className = "modal-overlay";
+  overlay.style.display = "flex";
+  overlay.style.zIndex = "200";
+  overlay.innerHTML =
+    '<div class="modal-content" style="max-width: 480px; animation: whatsNewSlideIn 0.3s ease;">'
+    + '<div class="modal-header" style="border-bottom: none; padding-bottom: 0;">'
+    + '<div>'
+    + '<h3 style="margin: 0; font-size: 20px;">มีอะไรใหม่ 🎉</h3>'
+    + '<div style="font-size: 12px; color: var(--color-muted); margin-top: 2px;">เวอร์ชัน ' + APP_VERSION + '</div>'
+    + '</div>'
+    + '<button class="icon-button" id="btnCloseWhatsNew">'
+    + '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>'
+    + '</button>'
+    + '</div>'
+    + '<div class="modal-body" style="padding-top: var(--space-3);">'
+    + '<div class="whatsnew-list">' + itemsHtml + '</div>'
+    + '</div>'
+    + '<div class="modal-footer" style="border-top: none;">'
+    + '<button class="primary-button" id="btnDismissWhatsNew" style="width: 100%;">เข้าใจแล้ว</button>'
+    + '</div>'
+    + '</div>';
+
+  document.body.appendChild(overlay);
+
+  var dismiss = function() {
+    // Save to server so it persists across sessions/browsers
+    try {
+      google.script.run.updateUserSettings({ "app.whatsNewSeen": APP_VERSION });
+      if (state && state.settings) state.settings["app.whatsNewSeen"] = APP_VERSION;
+    } catch (e) {}
+    overlay.style.opacity = "0";
+    overlay.style.transition = "opacity 0.2s ease";
+    setTimeout(function() {
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }, 200);
+  };
+
+  document.getElementById("btnCloseWhatsNew").addEventListener("click", dismiss);
+  document.getElementById("btnDismissWhatsNew").addEventListener("click", dismiss);
+  overlay.addEventListener("click", function(e) {
+    if (e.target === overlay) dismiss();
+  });
+}
+</script>

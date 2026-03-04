@@ -1,0 +1,548 @@
+<script>
+// ===== Document Type Categories =====
+var SALES_TYPES = ["QUO", "INV", "BILL", "TAX", "RCPT", "DO"];
+var PURCHASE_TYPES = ["PO", "PV", "PR"];
+var CREDIT_TYPES = ["CN"];
+
+function getDocCategory(docType) {
+  if (SALES_TYPES.indexOf(docType) !== -1) return "sales";
+  if (PURCHASE_TYPES.indexOf(docType) !== -1) return "purchase";
+  if (CREDIT_TYPES.indexOf(docType) !== -1) return "credit";
+  return "other";
+}
+
+var dashboardFilterState = {
+  range: 30,
+  docType: "",
+  fromDate: "",
+  toDate: ""
+};
+
+var _dashSalesTrendChart = null;
+var _dashDocTypeChart = null;
+
+// ===== Smart KPI Labels =====
+function getKpiLabels(docTypeFilter) {
+  if (!docTypeFilter) {
+    return { total: "ยอดรวมทั้งหมด", unpaid: "คงค้าง", paid: "ชำระแล้ว", count: "จำนวนเอกสาร", unpaidMeta: "รอชำระเงิน", paidMeta: "" };
+  }
+  var cat = getDocCategory(docTypeFilter);
+  var config = DOC_CONFIG[docTypeFilter] || {};
+  var typeName = config.nameTH || docTypeFilter;
+  if (cat === "sales") {
+    return { total: "ยอดขาย (" + typeName + ")", unpaid: "ค้างรับ", paid: "เก็บเงินแล้ว", count: "จำนวน " + typeName, unpaidMeta: "ลูกค้ายังไม่ชำระ", paidMeta: "" };
+  }
+  if (cat === "purchase") {
+    return { total: "ยอดสั่งซื้อ (" + typeName + ")", unpaid: "ค้างจ่าย", paid: "จ่ายแล้ว", count: "จำนวน " + typeName, unpaidMeta: "ยังไม่ได้จ่าย", paidMeta: "" };
+  }
+  if (cat === "credit") {
+    return { total: "ยอดลดหนี้ (" + typeName + ")", unpaid: "ค้างดำเนินการ", paid: "ดำเนินการแล้ว", count: "จำนวน " + typeName, unpaidMeta: "รอดำเนินการ", paidMeta: "" };
+  }
+  return { total: "ยอดรวม (" + typeName + ")", unpaid: "คงค้าง", paid: "ชำระแล้ว", count: "จำนวน " + typeName, unpaidMeta: "รอชำระเงิน", paidMeta: "" };
+}
+
+// ===== Date Range Helpers =====
+function getDashDateRange() {
+  var range = dashboardFilterState.range;
+  if (range === "custom") {
+    return { from: dashboardFilterState.fromDate, to: dashboardFilterState.toDate };
+  }
+  var now = new Date();
+  var fromDate, toDate;
+  if (range === "today") {
+    fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  } else {
+    var days = parseInt(range, 10) || 30;
+    fromDate = new Date(now.getTime() - days * 86400000);
+    toDate = now;
+  }
+  return {
+    from: fromDate.toISOString().split("T")[0],
+    to: toDate.toISOString().split("T")[0]
+  };
+}
+
+function getDashRangeLabel() {
+  var r = dashboardFilterState.range;
+  if (r === "custom") {
+    var dr = getDashDateRange();
+    var fFmt = new Date(dr.from).toLocaleDateString("th-TH", { day: "numeric", month: "short" });
+    var tFmt = new Date(dr.to).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
+    return fFmt + " - " + tFmt;
+  }
+  var labels = { today: "วันนี้", 7: "7 วัน", 30: "1 เดือน", 90: "3 เดือน", 365: "1 ปี" };
+  return labels[r] || "1 เดือน";
+}
+
+// ===== Date Range Pill Buttons =====
+function setDashRange(range) {
+  var customEl = document.getElementById("dashCustomRange");
+
+  document.querySelectorAll(".dash-range-btn").forEach(function(b) {
+    b.classList.toggle("active", String(b.getAttribute("data-range")) === String(range));
+  });
+
+  dashboardFilterState.range = range;
+
+  if (range === "custom") {
+    if (customEl) customEl.style.display = "flex";
+    var dateFrom = document.getElementById("dashboardDateFrom");
+    var dateTo = document.getElementById("dashboardDateTo");
+    if (dateFrom && !dateFrom.value) {
+      var d = new Date(); d.setDate(d.getDate() - 30);
+      dateFrom.value = d.toISOString().split("T")[0];
+    }
+    if (dateTo && !dateTo.value) dateTo.value = new Date().toISOString().split("T")[0];
+    return;
+  }
+
+  if (customEl) customEl.style.display = "none";
+  renderDashboard();
+}
+
+// ===== Main Render =====
+function renderDashboard() {
+  refreshDashboardKpis();
+  loadDashboardExtras();
+}
+
+function refreshDashboardKpis() {
+  var docs = state.documents || [];
+  var docTypeFilter = dashboardFilterState.docType;
+  var dateRange = getDashDateRange();
+
+  var from = new Date(dateRange.from);
+  var to = new Date(dateRange.to);
+  to.setHours(23, 59, 59, 999);
+
+  // Filter by date
+  var dateFiltered = docs.filter(function(doc) {
+    var docDate = new Date(doc.docDate || doc.createdAt);
+    return docDate >= from && docDate <= to;
+  });
+
+  // Filter by doc type
+  var filtered = dateFiltered;
+  if (docTypeFilter) {
+    filtered = dateFiltered.filter(function(doc) {
+      return (doc.docType || doc.type) === docTypeFilter;
+    });
+  }
+
+  // Calculate KPIs
+  var totalAmount = 0;
+  var paidTotal = 0;
+  var unpaidTotal = 0;
+  var unpaidDocs = [];
+
+  filtered.forEach(function(doc) {
+    var json = doc.json || {};
+    if (typeof json === "string") { try { json = JSON.parse(json); } catch(e) { json = {}; } }
+    var grandTotal = Number(doc.grandTotal) || parseFloat(json.grandTotal) || 0;
+    var docType = doc.docType || doc.type || "QUO";
+    var cat = getDocCategory(docType);
+
+    if (cat === "credit") {
+      totalAmount -= grandTotal;
+    } else {
+      totalAmount += grandTotal;
+    }
+
+    if (docType === "RCPT" || String(doc.paymentStatus) === "PAID") {
+      paidTotal += grandTotal;
+    } else {
+      unpaidTotal += grandTotal;
+      unpaidDocs.push({
+        docNo: doc.docNo || doc.name,
+        docType: docType,
+        customerName: json.customerName || json.vendorName || "ไม่ระบุ",
+        grandTotal: grandTotal,
+        dueDate: doc.dueDate,
+        isOverdue: doc.dueDate && new Date(doc.dueDate) < new Date()
+      });
+    }
+  });
+
+  // Update KPI labels
+  var labels = getKpiLabels(docTypeFilter);
+  setText("kpiTotalLabel", labels.total);
+  setText("kpiUnpaidLabel", labels.unpaid);
+  setText("kpiPaidLabel", labels.paid);
+  setText("kpiDocCountLabel", labels.count);
+  setText("kpiUnpaidMeta", labels.unpaidMeta);
+
+  // Update KPI values
+  setText("kpiSalesThisMonth", formatCompactMoney(totalAmount));
+  setText("kpiUnpaidTotal", formatCompactMoney(unpaidTotal));
+  setText("kpiPaidThisMonth", formatCompactMoney(paidTotal));
+  setText("kpiDocCount", filtered.length);
+  setText("kpiDocCountMeta", filtered.length === 1 ? "ฉบับ" : "ฉบับ");
+
+  // Period meta
+  var rangeLabel = getDashRangeLabel();
+  setText("kpiSalesPeriod", rangeLabel);
+  setText("kpiPaidMeta", rangeLabel);
+
+  // Render doc type breakdown panel
+  renderDocTypeBreakdown(dateFiltered, docTypeFilter);
+
+  // Render doc type doughnut chart
+  renderDashDocTypeChart(dateFiltered, docTypeFilter);
+
+  // Render unpaid docs panel
+  renderUnpaidDocsPanel(unpaidDocs);
+}
+
+// ===== Load Extra Data from Backend =====
+function loadDashboardExtras() {
+  var companyId = (state && state.companyId) ? state.companyId : "";
+
+  // Sales Trend Chart
+  runServer("getSalesTrendApi", companyId, 6).then(function(data) {
+    renderDashSalesTrendChart(data || []);
+  }).catch(function() {});
+
+  // Top Customers
+  runServer("getTopCustomersApi", companyId, 5).then(function(data) {
+    renderTopCustomersPanel(data || []);
+  }).catch(function() {
+    var el = document.getElementById("topCustomersPanel");
+    if (el) el.innerHTML = '<div class="muted" style="text-align:center;padding:20px;">ไม่สามารถโหลดข้อมูลได้</div>';
+  });
+
+  // Top Products
+  runServer("getTopProductsApi", companyId, 5).then(function(data) {
+    renderTopProductsPanel(data || []);
+  }).catch(function() {
+    var el = document.getElementById("topProductsPanel");
+    if (el) el.innerHTML = '<div class="muted" style="text-align:center;padding:20px;">ไม่สามารถโหลดข้อมูลได้</div>';
+  });
+}
+
+// ===== Sales Trend Bar Chart =====
+function renderDashSalesTrendChart(trendData) {
+  var ctx = document.getElementById("dashSalesTrendChart");
+  if (!ctx) return;
+
+  var labels = trendData.map(function(d) { return d.label || d.month; });
+  var amounts = trendData.map(function(d) { return d.total || d.sales || 0; });
+  var counts = trendData.map(function(d) { return d.count || 0; });
+
+  if (_dashSalesTrendChart) {
+    _dashSalesTrendChart.data.labels = labels;
+    _dashSalesTrendChart.data.datasets[0].data = amounts;
+    _dashSalesTrendChart.data.datasets[1].data = counts;
+    _dashSalesTrendChart.update();
+    return;
+  }
+
+  _dashSalesTrendChart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: "ยอดรวม (฿)",
+          data: amounts,
+          backgroundColor: "rgba(37, 99, 235, 0.7)",
+          borderRadius: 6,
+          yAxisID: "y"
+        },
+        {
+          label: "จำนวนเอกสาร",
+          data: counts,
+          type: "line",
+          borderColor: "#f59e0b",
+          backgroundColor: "rgba(245, 158, 11, 0.1)",
+          borderWidth: 2,
+          pointRadius: 4,
+          fill: true,
+          yAxisID: "y1"
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { intersect: false, mode: "index" },
+      plugins: { legend: { position: "top", labels: { font: { family: "'Sarabun', sans-serif", size: 12 } } } },
+      scales: {
+        y: { position: "left", beginAtZero: true, ticks: { callback: function(v) { return "฿" + v.toLocaleString(); } } },
+        y1: { position: "right", beginAtZero: true, grid: { drawOnChartArea: false } }
+      }
+    }
+  });
+}
+
+// ===== Doc Type Doughnut Chart =====
+function renderDashDocTypeChart(docs, activeFilter) {
+  var ctx = document.getElementById("dashDocTypeChart");
+  if (!ctx) return;
+
+  var groups = {};
+  docs.forEach(function(doc) {
+    var dt = doc.docType || doc.type || "QUO";
+    if (activeFilter && dt !== activeFilter) return;
+    var json = doc.json || {};
+    if (typeof json === "string") { try { json = JSON.parse(json); } catch(e) { json = {}; } }
+    var gt = Number(doc.grandTotal) || parseFloat(json.grandTotal) || 0;
+    if (!groups[dt]) groups[dt] = 0;
+    groups[dt] += gt;
+  });
+
+  var keys = Object.keys(groups);
+  if (!keys.length) {
+    if (_dashDocTypeChart) { _dashDocTypeChart.destroy(); _dashDocTypeChart = null; }
+    return;
+  }
+
+  var labels = keys.map(function(k) { var c = DOC_CONFIG[k]; return c ? c.nameTH : k; });
+  var data = keys.map(function(k) { return groups[k]; });
+  var colors = keys.map(function(k) { var c = DOC_CONFIG[k]; return c ? c.color : "#64748b"; });
+
+  if (_dashDocTypeChart) {
+    _dashDocTypeChart.data.labels = labels;
+    _dashDocTypeChart.data.datasets[0].data = data;
+    _dashDocTypeChart.data.datasets[0].backgroundColor = colors;
+    _dashDocTypeChart.update();
+    return;
+  }
+
+  _dashDocTypeChart = new Chart(ctx, {
+    type: "doughnut",
+    data: {
+      labels: labels,
+      datasets: [{
+        data: data,
+        backgroundColor: colors,
+        borderWidth: 2,
+        borderColor: "#fff"
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: "bottom", labels: { font: { family: "'Sarabun', sans-serif", size: 12 }, padding: 12 } }
+      }
+    }
+  });
+}
+
+// ===== Doc Type Breakdown Panel =====
+function renderDocTypeBreakdown(docs, activeFilter) {
+  var panel = document.getElementById("salesTrendPanel");
+  var header = document.getElementById("trendPanelHeader");
+  if (!panel) return;
+  clearElement(panel);
+
+  if (header) {
+    header.textContent = activeFilter
+      ? "รายละเอียด " + (DOC_CONFIG[activeFilter] ? DOC_CONFIG[activeFilter].nameTH : activeFilter)
+      : "สรุปตามประเภทเอกสาร";
+  }
+
+  var groups = {};
+  docs.forEach(function(doc) {
+    var dt = doc.docType || doc.type || "QUO";
+    if (activeFilter && dt !== activeFilter) return;
+    if (!groups[dt]) groups[dt] = { count: 0, total: 0, paid: 0, unpaid: 0 };
+    var json = doc.json || {};
+    if (typeof json === "string") { try { json = JSON.parse(json); } catch(e) { json = {}; } }
+    var gt = Number(doc.grandTotal) || parseFloat(json.grandTotal) || 0;
+    groups[dt].count++;
+    groups[dt].total += gt;
+    if (dt === "RCPT" || String(doc.paymentStatus) === "PAID") {
+      groups[dt].paid += gt;
+    } else {
+      groups[dt].unpaid += gt;
+    }
+  });
+
+  var keys = Object.keys(groups);
+  if (!keys.length) {
+    panel.innerHTML = '<div class="muted" style="text-align: center; padding: 20px;">ไม่มีข้อมูลในช่วงเวลานี้</div>';
+    return;
+  }
+
+  keys.sort(function(a, b) {
+    var order = { sales: 0, purchase: 1, credit: 2, other: 3 };
+    var ca = order[getDocCategory(a)] || 3;
+    var cb = order[getDocCategory(b)] || 3;
+    return ca - cb || a.localeCompare(b);
+  });
+
+  keys.forEach(function(dt, index) {
+    var g = groups[dt];
+    var config = DOC_CONFIG[dt] || {};
+    var cat = getDocCategory(dt);
+    var catLabel = cat === "sales" ? "ขาย" : cat === "purchase" ? "ซื้อ" : cat === "credit" ? "ลดหนี้" : "";
+
+    var row = document.createElement("div");
+    row.style.cssText = "padding: 10px 0;" + (index < keys.length - 1 ? " border-bottom: 1px solid var(--color-border);" : "");
+
+    var top = document.createElement("div");
+    top.style.cssText = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;";
+
+    var left = document.createElement("div");
+    left.style.cssText = "display: flex; align-items: center; gap: 8px;";
+    left.innerHTML = '<span style="background: ' + (config.color || "#666") + '20; color: ' + (config.color || "#666") + '; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">' + (config.nameTH || dt) + '</span>' +
+      '<span style="color: var(--color-muted); font-size: 11px;">' + catLabel + ' · ' + g.count + ' ฉบับ</span>';
+
+    var right = document.createElement("div");
+    right.style.cssText = "font-weight: 600; font-size: 14px;";
+    right.title = formatMoney(g.total);
+    right.textContent = formatCompactMoney(g.total);
+
+    top.appendChild(left);
+    top.appendChild(right);
+
+    var bottom = document.createElement("div");
+    bottom.style.cssText = "display: flex; gap: 16px; font-size: 12px; color: var(--color-muted);";
+    var paidPct = g.total > 0 ? Math.round(g.paid / g.total * 100) : 0;
+    bottom.innerHTML = '<span style="color: #10b981;" title="ชำระ ' + formatMoney(g.paid) + '">ชำระ ' + formatCompactMoney(g.paid) + '</span>' +
+      '<span style="color: #f59e0b;" title="ค้าง ' + formatMoney(g.unpaid) + '">ค้าง ' + formatCompactMoney(g.unpaid) + '</span>' +
+      '<span>' + paidPct + '% สำเร็จ</span>';
+
+    row.appendChild(top);
+    row.appendChild(bottom);
+    panel.appendChild(row);
+  });
+}
+
+// ===== Unpaid Docs Panel =====
+function renderUnpaidDocsPanel(unpaidDocs) {
+  var unpaidEl = document.getElementById("unpaidDocsPanel");
+  if (!unpaidEl) return;
+  clearElement(unpaidEl);
+
+  if (!unpaidDocs.length) {
+    unpaidEl.innerHTML = '<div class="muted" style="text-align: center; padding: 20px;">ไม่มีเอกสารค้างชำระ</div>';
+    return;
+  }
+
+  unpaidDocs.sort(function(a, b) {
+    if (a.isOverdue && !b.isOverdue) return -1;
+    if (!a.isOverdue && b.isOverdue) return 1;
+    return (b.grandTotal || 0) - (a.grandTotal || 0);
+  });
+
+  unpaidDocs.forEach(function(doc, index) {
+    var item = document.createElement("div");
+    item.style.cssText = "padding: 10px 0;" + (index < unpaidDocs.length - 1 ? " border-bottom: 1px solid var(--color-border);" : "");
+
+    var config = DOC_CONFIG[doc.docType] || {};
+    var line1 = document.createElement("div");
+    line1.style.cssText = "display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; font-size: 13px;";
+    line1.innerHTML = '<span style="background: ' + (config.color || "#666") + '20; color: ' + (config.color || "#666") + '; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">' + (config.nameTH || doc.docType || "") + '</span>' +
+      '<strong style="font-weight: 600; color: var(--color-text);">' + (doc.docNo || "") + '</strong>' +
+      '<span style="color: var(--color-muted); font-size: 13px;">· ' + (doc.customerName || "ไม่ระบุ") + '</span>';
+    if (doc.isOverdue) line1.style.color = "#b91c1c";
+
+    var line2 = document.createElement("div");
+    line2.className = "muted";
+    line2.style.cssText = "font-size: 12px; display: flex; align-items: center; gap: 8px;";
+    var duePart = doc.dueDate ? " · ครบกำหนด " + formatDateThai(doc.dueDate) : "";
+    line2.innerHTML = '<strong style="color: var(--color-text); font-size: 13px;" title="' + formatMoney(doc.grandTotal || 0) + '">' + formatCompactMoney(doc.grandTotal || 0) + '</strong>' + 
+      '<span>' + duePart + '</span>' +
+      (doc.isOverdue ? ' <span style="color: #b91c1c; font-weight: 600; background: #fee2e2; padding: 2px 6px; border-radius: 4px; font-size: 11px;">เกินกำหนด</span>' : "");
+
+    item.appendChild(line1);
+    item.appendChild(line2);
+    unpaidEl.appendChild(item);
+  });
+}
+
+// ===== Top Customers Panel =====
+function renderTopCustomersPanel(customers) {
+  var el = document.getElementById("topCustomersPanel");
+  if (!el) return;
+
+  if (!customers.length) {
+    el.innerHTML = '<div class="muted" style="text-align:center;padding:20px;">ยังไม่มีข้อมูลลูกค้า</div>';
+    return;
+  }
+
+  var html = '<table class="dash-data-table"><thead><tr><th>#</th><th>ลูกค้า</th><th class="text-right">ยอดรวม</th><th class="text-right">เอกสาร</th></tr></thead><tbody>';
+  customers.forEach(function(c, i) {
+    var rankClass = i < 3 ? "rank-" + (i + 1) : "rank-other";
+    html += '<tr>';
+    html += '<td><span class="rank-badge ' + rankClass + '">' + (i + 1) + '</span></td>';
+    html += '<td>' + escapeHtml(c.customerName || c.customerId || "-") + '</td>';
+    html += '<td class="text-right" style="font-weight:600;" title="' + formatMoney(c.total || 0) + '">' + formatCompactMoney(c.total || 0) + '</td>';
+    html += '<td class="text-right">' + (c.count || 0) + '</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+// ===== Top Products Panel =====
+function renderTopProductsPanel(products) {
+  var el = document.getElementById("topProductsPanel");
+  if (!el) return;
+
+  if (!products.length) {
+    el.innerHTML = '<div class="muted" style="text-align:center;padding:20px;">ยังไม่มีข้อมูลสินค้า</div>';
+    return;
+  }
+
+  var html = '<table class="dash-data-table"><thead><tr><th>#</th><th>สินค้า</th><th class="text-right">ยอดขาย</th><th class="text-right">จำนวน</th></tr></thead><tbody>';
+  products.forEach(function(p, i) {
+    var rankClass = i < 3 ? "rank-" + (i + 1) : "rank-other";
+    html += '<tr>';
+    html += '<td><span class="rank-badge ' + rankClass + '">' + (i + 1) + '</span></td>';
+    html += '<td>' + escapeHtml(p.name || p.productId || "-") + '</td>';
+    html += '<td class="text-right" style="font-weight:600;" title="' + formatMoney(p.total || 0) + '">' + formatCompactMoney(p.total || 0) + '</td>';
+    html += '<td class="text-right">' + (p.qty || 0) + '</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+// ===== escapeHtml helper =====
+function escapeHtml(str) {
+  if (!str) return "";
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// ===== Init Dashboard =====
+function initDashboard() {
+  var docTypeFilter = document.getElementById("dashboardDocTypeFilter");
+
+  // Set default date inputs
+  var today = new Date();
+  var d30 = new Date(today.getTime() - 30 * 86400000);
+  var dashboardDateFrom = document.getElementById("dashboardDateFrom");
+  var dashboardDateTo = document.getElementById("dashboardDateTo");
+  if (dashboardDateFrom) dashboardDateFrom.value = d30.toISOString().split("T")[0];
+  if (dashboardDateTo) dashboardDateTo.value = today.toISOString().split("T")[0];
+
+  dashboardFilterState.fromDate = dashboardDateFrom ? dashboardDateFrom.value : "";
+  dashboardFilterState.toDate = dashboardDateTo ? dashboardDateTo.value : "";
+
+  // Doc type filter
+  if (docTypeFilter) {
+    docTypeFilter.addEventListener("change", function() {
+      dashboardFilterState.docType = docTypeFilter.value;
+      refreshDashboardKpis();
+    });
+  }
+
+  // Apply custom date range
+  var btnApplyDateRange = document.getElementById("btnApplyDateRange");
+  if (btnApplyDateRange) {
+    btnApplyDateRange.addEventListener("click", function() {
+      var from = document.getElementById("dashboardDateFrom").value;
+      var to = document.getElementById("dashboardDateTo").value;
+      if (from && to) {
+        dashboardFilterState.fromDate = from;
+        dashboardFilterState.toDate = to;
+        renderDashboard();
+      }
+    });
+  }
+}
+</script>

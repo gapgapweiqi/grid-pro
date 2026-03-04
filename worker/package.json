@@ -1,0 +1,20 @@
+{
+  "name": "gridpro-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate": "wrangler d1 execute gridpro-db --local --file=./schema/001_init.sql",
+    "db:migrate:remote": "wrangler d1 execute gridpro-db --file=./schema/001_init.sql"
+  },
+  "dependencies": {
+    "hono": "^4.7.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250214.0",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.0.0"
+  }
+}

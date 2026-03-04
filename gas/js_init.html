@@ -1,0 +1,95 @@
+<script>
+// ===== Bottom Sheet (Mobile More Menu) =====
+function openBottomSheet() {
+  var overlay = document.getElementById("bottomSheetOverlay");
+  var sheet = document.getElementById("bottomSheet");
+  if (overlay) overlay.classList.add("show");
+  if (sheet) requestAnimationFrame(function() { sheet.classList.add("show"); });
+}
+
+function closeBottomSheet() {
+  var overlay = document.getElementById("bottomSheetOverlay");
+  var sheet = document.getElementById("bottomSheet");
+  if (sheet) sheet.classList.remove("show");
+  if (overlay) overlay.classList.remove("show");
+}
+
+function updateBottomNavActive(viewId) {
+  document.querySelectorAll(".bottom-nav-item[data-view]").forEach(function(el) {
+    el.classList.toggle("active", el.dataset.view === viewId);
+  });
+  document.querySelectorAll(".bottom-sheet-item[data-view]").forEach(function(el) {
+    el.classList.toggle("active", el.dataset.view === viewId);
+  });
+}
+
+function init() {
+  console.log("[init] START");
+  applyTheme(state.settings["ui.theme"] || state.defaults.theme || "blue");
+  applyFont(state.settings["ui.font"] || state.defaults.font || "sarabun");
+  if (typeof applyDocColorsFromSettings === "function") applyDocColorsFromSettings();
+  initCompanySwitcher();
+  console.log("[init] companyId after switcher:", state.companyId);
+  initNavEvents();
+  initMasterButtons();
+  initSettingsPage();
+  initDocumentPage();
+  initDocHistoryPage();
+  initPaymentsPage();
+  initDashboard();
+  initPreviewZoomControls();
+
+  // Always fetch FRESH data from server to prevent stale cache issues
+  console.log("[init] fetching fresh bootstrap from server...");
+  runServer("getBootstrapData").then(function(freshData) {
+    console.log("[init] fresh bootstrap received, companies:", freshData.companies ? freshData.companies.length : 0);
+    if (freshData && freshData.companies) {
+      state.companies = freshData.companies;
+      state.settings = freshData.settings || state.settings;
+      state.sheetsId = freshData.sheetsId || state.sheetsId;
+      state.sheetsConnection = freshData.sheetsConnection || state.sheetsConnection;
+      if (freshData.config) {
+        state.themes = freshData.config.themes || state.themes;
+        state.fonts = freshData.config.fonts || state.fonts;
+        state.defaults = freshData.config.defaults || state.defaults;
+      }
+      // Re-init company switcher with fresh data
+      initCompanySwitcher();
+      applyTheme(state.settings["ui.theme"] || state.defaults.theme || "blue");
+      applyFont(state.settings["ui.font"] || state.defaults.font || "sarabun");
+      if (typeof applyDocColorsFromSettings === "function") applyDocColorsFromSettings();
+    }
+    return refreshAll();
+  }).then(function() {
+    console.log("[init] refreshAll done, now calling loadDocHistory + loadPayments");
+    if (typeof refreshDocNo === "function") refreshDocNo();
+    loadDocHistory();
+    loadPayments();
+    checkWhatsNew();
+  }).catch(function(err) {
+    console.error("[init] fresh bootstrap error, falling back to cached:", err);
+    // Fallback: use whatever bootstrap data we have
+    refreshAll().then(function() {
+      if (typeof refreshDocNo === "function") refreshDocNo();
+      loadDocHistory();
+      loadPayments();
+    });
+  });
+}
+
+function debugDocHistory() {
+  console.log("=== DEBUG DOC HISTORY ===");
+  console.log("state.sheetsId:", state.sheetsId);
+  console.log("state.companyId:", state.companyId);
+  console.log("state.companies:", state.companies.length);
+  console.log("docHistoryState:", JSON.stringify(docHistoryState, null, 2));
+  console.log("Calling debugDocHistoryApi...");
+  runServer("debugDocHistoryApi").then(function(result) {
+    console.log("debugDocHistoryApi result:", JSON.stringify(result, null, 2));
+  }).catch(function(err) {
+    console.error("debugDocHistoryApi error:", err);
+  });
+}
+
+document.addEventListener("DOMContentLoaded", init);
+</script>

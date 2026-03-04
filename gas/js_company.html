@@ -1,0 +1,710 @@
+<script>
+var companyLogoData = "";
+
+function updateLogoRemoveBtn() {
+  var btn = document.getElementById("btnRemoveLogo");
+  if (btn) btn.style.display = companyLogoData ? "block" : "none";
+}
+
+function renderCompaniesList() {
+  var container = document.getElementById("companyList");
+  if (!container) return;
+  var companies = state.companies || [];
+  clearElement(container);
+  if (!companies.length) {
+    var card = document.createElement("div");
+    card.className = "company-card";
+    var info = document.createElement("div");
+    info.className = "company-info muted";
+    info.textContent = 'ยังไม่มีข้อมูลบริษัท กดปุ่ม "+ เพิ่มบริษัท" เพื่อเริ่มต้น';
+    card.appendChild(info);
+    container.appendChild(card);
+    return;
+  }
+
+  companies.forEach(function(company) {
+    var companyId = company.entityId || company.companyId || "";
+    var card = document.createElement("div");
+    card.className = "company-card";
+
+    var title = document.createElement("h3");
+    title.textContent = (company.name || "บริษัท") + (company.code ? " (" + company.code + ")" : "");
+    card.appendChild(title);
+
+    var info = document.createElement("div");
+    info.className = "company-info";
+    var lines = [];
+    if (company.taxId) lines.push("Tax ID: " + company.taxId);
+    if (company.phone) lines.push("โทร: " + (typeof formatPhone === "function" ? formatPhone(company.phone) : company.phone));
+    if (company.email) lines.push("อีเมล: " + company.email);
+    if (company.address) lines.push(company.address);
+    if (!lines.length) lines.push("—");
+    lines.forEach(function(line) {
+      var div = document.createElement("div");
+      div.textContent = line;
+      info.appendChild(div);
+    });
+    card.appendChild(info);
+
+    var actions = document.createElement("div");
+    actions.className = "section-actions";
+    actions.style.marginTop = "12px";
+
+    var btnSelect = document.createElement("button");
+    btnSelect.type = "button";
+    btnSelect.className = "secondary-button";
+    btnSelect.textContent = "เลือกใช้";
+    btnSelect.addEventListener("click", function() {
+      var switcher = document.getElementById("companySwitcher");
+      if (switcher) {
+        switcher.value = companyId;
+        switcher.dispatchEvent(new Event("change"));
+      }
+      setView("dashboard");
+    });
+    actions.appendChild(btnSelect);
+
+    var btnEdit = document.createElement("button");
+    btnEdit.type = "button";
+    btnEdit.className = "secondary-button";
+    btnEdit.textContent = "แก้ไข";
+    btnEdit.addEventListener("click", function() { editCompany(company); });
+
+    var btnDelete = document.createElement("button");
+    btnDelete.type = "button";
+    btnDelete.className = "secondary-button";
+    btnDelete.textContent = "ลบ";
+    btnDelete.addEventListener("click", function() { deleteCompany(companyId); });
+
+    actions.appendChild(btnEdit);
+    actions.appendChild(btnDelete);
+    card.appendChild(actions);
+    container.appendChild(card);
+  });
+}
+
+function addCompany() {
+  document.getElementById("companyModalTitle").textContent = "เพิ่มบริษัท";
+  document.getElementById("companyEditId").value = "";
+  
+  var companies = state.companies || [];
+  var maxNum = 0;
+  companies.forEach(function(c) {
+    var match = (c.code || "").match(/^C(\d+)$/);
+    if (match) {
+      var num = parseInt(match[1], 10);
+      if (num > maxNum) maxNum = num;
+    }
+  });
+  var nextCode = "C" + String(maxNum + 1).padStart(3, "0");
+  
+  document.getElementById("companyCode").value = nextCode;
+  document.getElementById("companyName").value = "";
+  document.getElementById("companyTaxId").value = "";
+  document.getElementById("companyAddress").value = "";
+  document.getElementById("companyPhone").value = "";
+  document.getElementById("companyEmail").value = "";
+  document.getElementById("companyStatus").value = "ACTIVE";
+  var hoEl = document.getElementById("companyIsHeadOffice"); if (hoEl) hoEl.checked = false;
+  companyLogoData = "";
+  var preview = document.getElementById("companyLogoPreview");
+  if (preview) {
+    preview.innerHTML = '<span style="color: var(--color-muted); font-size: 12px;">ไม่มีโลโก้</span>';
+  }
+  updateLogoRemoveBtn();
+  document.getElementById("companyModal").style.display = "flex";
+}
+
+function saveCompany() {
+  var editId = document.getElementById("companyEditId").value;
+  var code = document.getElementById("companyCode").value;
+  var name = document.getElementById("companyName").value;
+  var taxId = document.getElementById("companyTaxId").value;
+  var address = document.getElementById("companyAddress").value;
+  var phone = document.getElementById("companyPhone").value;
+  var email = document.getElementById("companyEmail").value;
+  var status = document.getElementById("companyStatus").value;
+  var hoEl = document.getElementById("companyIsHeadOffice");
+  var isHeadOffice = hoEl ? hoEl.checked : false;
+
+  if (!name) {
+    showToast("กรุณากรอกชื่อบริษัท", { type: "warning" });
+    return;
+  }
+
+  var logoPromise;
+  if (companyLogoData && companyLogoData.indexOf("data:") === 0) {
+    // base64 → upload to Drive first
+    showToast("กำลังอัพโหลดโลโก้...", { type: "info" });
+    logoPromise = runServer("uploadCompanyLogoApi", state.companyId, companyLogoData, null, "company_logo.png")
+      .then(function(res) { return res.url; });
+  } else {
+    // Already a URL or empty
+    logoPromise = Promise.resolve(companyLogoData || "");
+  }
+
+  logoPromise.then(function(logoUrl) {
+    var companyJson = { isHeadOffice: isHeadOffice };
+    if (logoUrl) {
+      companyJson.logo = logoUrl;
+    }
+    
+    return runServer("saveCompany", {
+      entityId: editId || undefined,
+      code: code || "",
+      name: name,
+      taxId: taxId || "",
+      phone: phone || "",
+      email: email || "",
+      address: address || "",
+      status: status,
+      json: companyJson
+    });
+  })
+  .then(function(result) {
+    return runServer("listCompaniesApi").then(function(companies) {
+      state.companies = companies;
+      var createdId = result && result.record ? result.record.entityId : "";
+      if (createdId && !editId) {
+        state.companyId = createdId;
+        safeLocalStorageSet("companyId", createdId);
+        var switcher = document.getElementById("companySwitcher");
+        if (switcher) switcher.value = createdId;
+      }
+      initCompanySwitcher();
+      return refreshAll();
+    });
+  })
+  .then(function() {
+    document.getElementById("companyModal").style.display = "none";
+  })
+  .catch(function(error) {
+    console.error("saveCompany error:", error);
+    showToast((error.message || error), { type: "error" });
+  });
+}
+
+function editCompany(company) {
+  document.getElementById("companyModalTitle").textContent = "แก้ไขบริษัท";
+  document.getElementById("companyEditId").value = company.entityId || "";
+  document.getElementById("companyCode").value = company.code || "";
+  document.getElementById("companyName").value = company.name || "";
+  document.getElementById("companyTaxId").value = company.taxId || "";
+  document.getElementById("companyAddress").value = company.address || "";
+  document.getElementById("companyPhone").value = company.phone || "";
+  document.getElementById("companyEmail").value = company.email || "";
+  document.getElementById("companyStatus").value = company.status || "ACTIVE";
+  
+  var companyJson = company.json || {};
+  var hoEl2 = document.getElementById("companyIsHeadOffice"); if (hoEl2) hoEl2.checked = !!companyJson.isHeadOffice;
+  companyLogoData = companyJson.logo || "";
+  var preview = document.getElementById("companyLogoPreview");
+  if (preview) {
+    if (companyLogoData) {
+      preview.innerHTML = '<img src="' + companyLogoData + '" style="width: 100%; height: 100%; object-fit: contain;" />';
+    } else {
+      preview.innerHTML = '<span style="color: var(--color-muted); font-size: 12px;">ไม่มีโลโก้</span>';
+    }
+  }
+  updateLogoRemoveBtn();
+  document.getElementById("companyModal").style.display = "flex";
+}
+
+function deleteCompany(companyId) {
+  if (!companyId) return;
+  showConfirm({
+    title: "ลบบริษัท",
+    message: "ต้องการลบบริษัทนี้หรือไม่? ข้อมูลทั้งหมดจะถูกลบ",
+    type: "danger",
+    confirmText: "ลบบริษัท"
+  }).then(function(confirmed) {
+    if (!confirmed) return;
+  
+  runServer("deleteEntities", "COMPANY", [companyId])
+    .then(function() {
+      return runServer("listCompaniesApi");
+    })
+    .then(function(companies) {
+      state.companies = companies;
+      if (state.companyId === companyId) {
+        var next = state.companies[0] ? state.companies[0].entityId : "";
+        state.companyId = next || "";
+        safeLocalStorageSet("companyId", state.companyId);
+      }
+      initCompanySwitcher();
+      showToast("ลบบริษัทเรียบร้อยแล้ว", { type: "success" });
+      return refreshAll();
+    })
+    .catch(function(error) { showError(error); });
+  });
+}
+
+function initCompanySwitcher() {
+  var select = document.getElementById("companySwitcher");
+  if (!select) return;
+  var companies = state.companies || [];
+  select.innerHTML = "";
+  if (!companies.length) {
+    var option = document.createElement("option");
+    option.textContent = "ยังไม่มีบริษัท";
+    option.value = "";
+    select.appendChild(option);
+    select.disabled = true;
+    state.companyId = "";
+    safeLocalStorageSet("companyId", "");
+    return;
+  }
+  select.disabled = false;
+  companies.forEach(function(company) {
+    var option = document.createElement("option");
+    option.textContent = company.name || company.companyName || "บริษัท";
+    option.value = company.entityId || company.companyId || "";
+    select.appendChild(option);
+  });
+
+  var stored = safeLocalStorageGet("companyId");
+  if (stored && companies.some(function(item) { return (item.entityId || item.companyId || "") === stored; })) {
+    select.value = stored;
+  }
+
+  if (!select.value) {
+    select.value = companies[0].entityId || companies[0].companyId || "";
+  }
+
+  state.companyId = select.value || "";
+  safeLocalStorageSet("companyId", state.companyId);
+
+  select.onchange = function() {
+    state.companyId = select.value || "";
+    safeLocalStorageSet("companyId", state.companyId);
+    refreshAll();
+  };
+}
+
+function initNavEvents() {
+  document.querySelectorAll("button[data-view]").forEach(function(button) {
+    button.addEventListener("click", function() {
+      var viewId = button.dataset.view;
+      if (viewId) {
+        setView(viewId);
+        closeMobileSidebar();
+        if (viewId === "doc-history" && typeof loadDocHistory === "function") loadDocHistory();
+        if (viewId === "payments" && typeof loadPayments === "function") loadPayments();
+        if (viewId === "document" && typeof updateDocTypeFields === "function") {
+          var dtEl = document.getElementById("docTypeSelect");
+          if (dtEl) { docState.docNoEdited = false; updateDocTypeFields(dtEl.value || "QUO"); }
+        }
+      }
+    });
+  });
+
+  var mobileMenu = document.getElementById("mobileMenu");
+  if (mobileMenu) {
+    mobileMenu.addEventListener("click", toggleSidebar);
+  }
+
+  var overlay = document.getElementById("sidebarOverlay");
+  if (overlay) {
+    overlay.addEventListener("click", closeMobileSidebar);
+  }
+}
+
+function initMasterButtons() {
+  var btnAddProduct = document.getElementById("btnAddProduct");
+  if (btnAddProduct) btnAddProduct.addEventListener("click", addProduct);
+
+  var btnAddCustomer = document.getElementById("btnAddCustomer");
+  if (btnAddCustomer) btnAddCustomer.addEventListener("click", addCustomer);
+
+  var btnAddSalesperson = document.getElementById("btnAddSalesperson");
+  if (btnAddSalesperson) btnAddSalesperson.addEventListener("click", addSalesperson);
+
+  var btnAddCompany = document.getElementById("btnAddCompany");
+  if (btnAddCompany) btnAddCompany.addEventListener("click", addCompany);
+
+  var btnCloseCompanyModal = document.getElementById("btnCloseCompanyModal");
+  if (btnCloseCompanyModal) {
+    btnCloseCompanyModal.addEventListener("click", function() {
+      document.getElementById("companyModal").style.display = "none";
+    });
+  }
+
+  var btnCancelCompany = document.getElementById("btnCancelCompany");
+  if (btnCancelCompany) {
+    btnCancelCompany.addEventListener("click", function() {
+      document.getElementById("companyModal").style.display = "none";
+    });
+  }
+
+  var btnSaveCompany = document.getElementById("btnSaveCompany");
+  if (btnSaveCompany) btnSaveCompany.addEventListener("click", saveCompany);
+
+  var btnUploadLogo = document.getElementById("btnUploadLogo");
+  var companyLogoInput = document.getElementById("companyLogoInput");
+  if (btnUploadLogo && companyLogoInput) {
+    btnUploadLogo.addEventListener("click", function() { companyLogoInput.click(); });
+    
+    companyLogoInput.addEventListener("change", function(e) {
+      var file = e.target.files[0];
+      if (file) {
+        if (file.size > 5 * 1024 * 1024) {
+          showToast("กรุณาเลือกไฟล์ไม่เกิน 5MB", { type: "warning" });
+          return;
+        }
+        
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+          resizeImageBase64(ev.target.result, 400, 400, function(resizedSrc) {
+            companyLogoData = resizedSrc;
+            var preview = document.getElementById("companyLogoPreview");
+            if (preview) {
+              preview.innerHTML = '<img src="' + resizedSrc + '" style="max-width: 100%; max-height: 100%; object-fit: contain;" />';
+            }
+            updateLogoRemoveBtn();
+          });
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
+  var btnRemoveLogo = document.getElementById("btnRemoveLogo");
+  if (btnRemoveLogo) {
+    btnRemoveLogo.addEventListener("click", function() {
+      companyLogoData = "";
+      var preview = document.getElementById("companyLogoPreview");
+      if (preview) {
+        preview.innerHTML = '<span style="color: var(--color-muted); font-size: 12px;">ไม่มีโลโก้</span>';
+      }
+      var input = document.getElementById("companyLogoInput");
+      if (input) input.value = "";
+      updateLogoRemoveBtn();
+    });
+  }
+
+  // Select-all checkboxes
+  var selectAllProducts = document.getElementById("selectAllProducts");
+  if (selectAllProducts) {
+    selectAllProducts.addEventListener("change", function() {
+      var checked = selectAllProducts.checked;
+      var tbody = document.getElementById("productsTbody");
+      if (tbody) {
+        tbody.querySelectorAll('input[type="checkbox"]').forEach(function(cb) { cb.checked = checked; });
+      }
+    });
+  }
+
+  var selectAllCustomers = document.getElementById("selectAllCustomers");
+  if (selectAllCustomers) {
+    selectAllCustomers.addEventListener("change", function() {
+      var checked = selectAllCustomers.checked;
+      var tbody = document.getElementById("customersTbody");
+      if (tbody) {
+        tbody.querySelectorAll('input[type="checkbox"]').forEach(function(cb) { cb.checked = checked; });
+      }
+    });
+  }
+
+  var customerTypeFilter = document.getElementById("customerTypeFilter");
+  if (customerTypeFilter) {
+    customerTypeFilter.addEventListener("change", function() { renderCustomersTable(); });
+  }
+
+  var btnExportProductsCsv = document.getElementById("btnExportProductsCsv");
+  if (btnExportProductsCsv) btnExportProductsCsv.addEventListener("click", function() { exportCsv("PRODUCT"); });
+
+  var btnImportProductsCsv = document.getElementById("btnImportProductsCsv");
+  if (btnImportProductsCsv) btnImportProductsCsv.addEventListener("click", function() { importCsv("PRODUCT"); });
+
+  var btnExportCustomersCsv = document.getElementById("btnExportCustomersCsv");
+  if (btnExportCustomersCsv) btnExportCustomersCsv.addEventListener("click", function() { exportCsv("CUSTOMER"); });
+
+  var btnImportCustomersCsv = document.getElementById("btnImportCustomersCsv");
+  if (btnImportCustomersCsv) btnImportCustomersCsv.addEventListener("click", function() { importCsv("CUSTOMER"); });
+
+  var productModal = document.getElementById("productModal");
+  var closeProductModal = document.getElementById("closeProductModal");
+  var btnCancelProduct = document.getElementById("btnCancelProduct");
+  var btnSaveProduct = document.getElementById("btnSaveProduct");
+  
+  if (closeProductModal) closeProductModal.addEventListener("click", function() { productModal.style.display = "none"; });
+  if (btnCancelProduct) btnCancelProduct.addEventListener("click", function() { productModal.style.display = "none"; });
+  if (btnSaveProduct) btnSaveProduct.addEventListener("click", saveProductFromModal);
+  if (productModal) productModal.addEventListener("click", function(e) { if (e.target === productModal) productModal.style.display = "none"; });
+
+  var customerModal = document.getElementById("customerModal");
+  var closeCustomerModal = document.getElementById("closeCustomerModal");
+  var btnCancelCustomer = document.getElementById("btnCancelCustomer");
+  var btnSaveCustomer = document.getElementById("btnSaveCustomer");
+  
+  if (closeCustomerModal) closeCustomerModal.addEventListener("click", function() { customerModal.style.display = "none"; });
+  if (btnCancelCustomer) btnCancelCustomer.addEventListener("click", function() { customerModal.style.display = "none"; });
+  if (btnSaveCustomer) btnSaveCustomer.addEventListener("click", saveCustomerFromModal);
+  if (customerModal) customerModal.addEventListener("click", function(e) { if (e.target === customerModal) customerModal.style.display = "none"; });
+
+  var salespersonModal = document.getElementById("salespersonModal");
+  var closeSalespersonModal = document.getElementById("closeSalespersonModal");
+  var btnCancelSalesperson = document.getElementById("btnCancelSalesperson");
+  var btnSaveSalesperson = document.getElementById("btnSaveSalesperson");
+  
+  if (closeSalespersonModal) closeSalespersonModal.addEventListener("click", function() { salespersonModal.style.display = "none"; });
+  if (btnCancelSalesperson) btnCancelSalesperson.addEventListener("click", function() { salespersonModal.style.display = "none"; });
+  if (btnSaveSalesperson) btnSaveSalesperson.addEventListener("click", saveSalespersonFromModal);
+  if (salespersonModal) salespersonModal.addEventListener("click", function(e) { if (e.target === salespersonModal) salespersonModal.style.display = "none"; });
+}
+
+function switchSettingsTab(tabName) {
+  var tabNames = ["connection", "display", "doccolors", "docno", "defaults"];
+  document.querySelectorAll("#settingsTabs .tab-btn").forEach(function(btn, idx) {
+    btn.classList.toggle("active", tabNames[idx] === tabName);
+  });
+  tabNames.forEach(function(t) {
+    var el = document.getElementById("settingsTab-" + t);
+    if (el) el.classList.toggle("active", t === tabName);
+  });
+  if (tabName === "doccolors") renderDocColorGrid();
+}
+
+function initSettingsPage() {
+  var fontSelect = document.getElementById("settingFont");
+  var themeSelect = document.getElementById("settingTheme");
+  var vatInput = document.getElementById("settingVat");
+  var whtInput = document.getElementById("settingWht");
+  var currencySelect = document.getElementById("settingCurrency");
+  var docLangSelect = document.getElementById("settingDocLang");
+
+  if (fontSelect) fontSelect.value = state.settings["ui.font"] || "sarabun";
+  if (themeSelect) themeSelect.value = state.settings["ui.theme"] || "blue";
+  if (vatInput) vatInput.value = state.settings["defaults.vatRate"] || "7";
+  if (whtInput) whtInput.value = state.settings["defaults.whtRate"] || "3";
+  if (currencySelect) currencySelect.value = state.settings["defaults.currency"] || "THB";
+  if (docLangSelect) docLangSelect.value = state.settings["doc.language"] || "th";
+
+  // --- DocNo settings ---
+  var patternEl = document.getElementById("settingDocNoPattern");
+  var digitsEl = document.getElementById("settingDocNoDigits");
+  var sepEl = document.getElementById("settingDocNoSeparator");
+  if (patternEl) patternEl.value = state.settings["docNo.pattern"] || "A";
+  if (digitsEl) digitsEl.value = state.settings["docNo.digits"] || "4";
+  if (sepEl) sepEl.value = state.settings["docNo.separator"] || "-";
+  var prefixInputs = document.querySelectorAll(".docno-prefix");
+  prefixInputs.forEach(function(inp) {
+    var dt = inp.getAttribute("data-doctype");
+    var saved = state.settings["docNo.prefix." + dt];
+    if (saved) inp.value = saved;
+  });
+  // Live preview
+  function updateDocNoPreview() {
+    var p = patternEl ? patternEl.value : "A";
+    var d = parseInt(digitsEl ? digitsEl.value : "4", 10);
+    var s = sepEl ? sepEl.value : "-";
+    var prefix = "QUO";
+    var quoInput = document.querySelector('.docno-prefix[data-doctype="QUO"]');
+    if (quoInput && quoInput.value) prefix = quoInput.value;
+    var now = new Date();
+    var bYear = now.getFullYear() + 543;
+    var cYear = now.getFullYear();
+    var mm = String(now.getMonth() + 1).padStart(2, "0");
+    var seq = "0".repeat(d - 1) + "1";
+    var datePart = "";
+    if (p === "A") datePart = String(bYear).slice(-2) + mm;
+    else if (p === "B") datePart = String(bYear).slice(-2);
+    else if (p === "C") datePart = String(bYear);
+    else if (p === "D") datePart = String(cYear).slice(-2) + mm;
+    else if (p === "E") datePart = String(cYear);
+    var preview = document.getElementById("docNoPreviewText");
+    if (preview) preview.textContent = prefix + datePart + s + seq;
+  }
+  if (patternEl) patternEl.addEventListener("change", updateDocNoPreview);
+  if (digitsEl) digitsEl.addEventListener("change", updateDocNoPreview);
+  if (sepEl) sepEl.addEventListener("change", updateDocNoPreview);
+  prefixInputs.forEach(function(inp) { inp.addEventListener("input", updateDocNoPreview); });
+  updateDocNoPreview();
+
+  if (fontSelect) {
+    fontSelect.addEventListener("change", function() { applyFont(fontSelect.value); });
+  }
+  if (themeSelect) {
+    themeSelect.addEventListener("change", function() { applyTheme(themeSelect.value); });
+  }
+
+  // Per-tab save buttons
+  var btnDisplay = document.getElementById("btnSaveDisplaySettings");
+  if (btnDisplay) btnDisplay.addEventListener("click", saveDisplaySettings);
+  var btnDocNo = document.getElementById("btnSaveDocNoSettings");
+  if (btnDocNo) btnDocNo.addEventListener("click", saveDocNoSettings);
+  var btnDefaults = document.getElementById("btnSaveDefaultSettings");
+  if (btnDefaults) btnDefaults.addEventListener("click", saveDefaultSettings);
+  var btnDocColors = document.getElementById("btnSaveDocColors");
+  if (btnDocColors) btnDocColors.addEventListener("click", saveDocColorSettings);
+}
+
+function _saveSettingsPartial(settings, toastMsg, onDone) {
+  google.script.run
+    .withSuccessHandler(function() {
+      showToast(toastMsg || "บันทึกเรียบร้อย", { type: "success" });
+      Object.assign(state.settings, settings);
+      if (onDone) onDone();
+    })
+    .withFailureHandler(function(err) { showToast(err.message, { type: "error" }); })
+    .updateUserSettings(settings);
+}
+
+function saveDisplaySettings() {
+  var fontEl = document.getElementById("settingFont");
+  var themeEl = document.getElementById("settingTheme");
+  _saveSettingsPartial({
+    "ui.font": fontEl ? fontEl.value : "sarabun",
+    "ui.theme": themeEl ? themeEl.value : "blue"
+  }, "บันทึกการแสดงผลเรียบร้อย");
+}
+
+function saveDocNoSettings() {
+  var patternEl = document.getElementById("settingDocNoPattern");
+  var digitsEl = document.getElementById("settingDocNoDigits");
+  var sepEl = document.getElementById("settingDocNoSeparator");
+  var settings = {
+    "docNo.pattern": patternEl ? patternEl.value : "A",
+    "docNo.digits": digitsEl ? digitsEl.value : "4",
+    "docNo.separator": sepEl ? sepEl.value : "-"
+  };
+  var prefixInputs = document.querySelectorAll(".docno-prefix");
+  prefixInputs.forEach(function(inp) {
+    var dt = inp.getAttribute("data-doctype");
+    if (dt && inp.value) settings["docNo.prefix." + dt] = inp.value;
+  });
+  _saveSettingsPartial(settings, "บันทึกรูปแบบเลขที่เอกสารเรียบร้อย", function() {
+    // Seamless: update document page preview immediately
+    if (typeof docState !== "undefined") docState.docNoEdited = false;
+    var dtEl = document.getElementById("docTypeSelect");
+    if (dtEl && typeof updateDocTypeFields === "function") {
+      updateDocTypeFields(dtEl.value || "QUO");
+    }
+  });
+}
+
+function saveDefaultSettings() {
+  var vatEl = document.getElementById("settingVat");
+  var whtEl = document.getElementById("settingWht");
+  var currencyEl = document.getElementById("settingCurrency");
+  var docLangEl = document.getElementById("settingDocLang");
+  _saveSettingsPartial({
+    "defaults.vatRate": vatEl ? vatEl.value : "7",
+    "defaults.whtRate": whtEl ? whtEl.value : "3",
+    "defaults.currency": currencyEl ? currencyEl.value : "THB",
+    "doc.language": docLangEl ? docLangEl.value : "th"
+  }, "บันทึกค่าเริ่มต้นเรียบร้อย");
+}
+
+var _docColorGridRendered = false;
+function renderDocColorGrid() {
+  var grid = document.getElementById("docColorGrid");
+  if (!grid) return;
+  if (_docColorGridRendered) return;
+  _docColorGridRendered = true;
+
+  var types = [
+    { id: "QUO", th: "ใบเสนอราคา", en: "Quotation" },
+    { id: "INV", th: "ใบแจ้งหนี้", en: "Invoice" },
+    { id: "BILL", th: "ใบวางบิล", en: "Billing Note" },
+    { id: "TAX", th: "ใบกำกับภาษี", en: "Tax Invoice" },
+    { id: "RCPT", th: "ใบเสร็จรับเงิน", en: "Receipt" },
+    { id: "DO", th: "ใบส่งของ", en: "Delivery Order" },
+    { id: "PO", th: "ใบสั่งซื้อ", en: "Purchase Order" },
+    { id: "CN", th: "ใบลดหนี้", en: "Credit Note" },
+    { id: "PV", th: "ใบสำคัญจ่าย", en: "Payment Voucher" },
+    { id: "PR", th: "ใบขอซื้อ", en: "Purchase Request" }
+  ];
+
+  grid.innerHTML = "";
+  types.forEach(function(t) {
+    var cfg = DOC_CONFIG[t.id] || {};
+    var savedColor = state.settings["docColor." + t.id] || cfg.color || "#1e5c8a";
+
+    var card = document.createElement("div");
+    card.style.cssText = "border:1px solid #e5e7eb;border-radius:8px;padding:16px;background:#fff;";
+
+    // Header: name + color picker
+    var header = document.createElement("div");
+    header.style.cssText = "display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;";
+    header.innerHTML = '<div><div style="font-weight:600;font-size:14px;">' + t.th + '</div><div style="font-size:11px;color:#9ca3af;">' + t.en + '</div></div>';
+    var picker = document.createElement("input");
+    picker.type = "color";
+    picker.value = savedColor;
+    picker.className = "doccolor-picker";
+    picker.setAttribute("data-doctype", t.id);
+    picker.style.cssText = "width:40px;height:32px;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;padding:2px;background:#fff;";
+    header.appendChild(picker);
+    card.appendChild(header);
+
+    // Mini document preview
+    var preview = document.createElement("div");
+    preview.className = "doccolor-preview-" + t.id;
+    preview.style.cssText = "border:1px solid #e5e7eb;border-radius:6px;padding:12px;background:#fff;font-family:'Sarabun',sans-serif;font-size:11px;color:#111827;line-height:1.5;";
+    _renderMiniPreview(preview, t, savedColor);
+    card.appendChild(preview);
+
+    grid.appendChild(card);
+
+    // Live update on color change
+    picker.addEventListener("input", function() {
+      var pv = card.querySelector(".doccolor-preview-" + t.id);
+      _renderMiniPreview(pv, t, picker.value);
+    });
+  });
+}
+
+function _renderMiniPreview(el, t, color) {
+  var soft = hexToRgba(color, 0.12);
+  var company = state.companies.find(function(c) { return c.entityId === state.companyId; }) || {};
+  var companyName = company.name || "ชื่อบริษัท";
+  el.innerHTML =
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">' +
+      '<div style="min-width:0;">' +
+        '<div style="font-size:13px;font-weight:700;color:' + color + ';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + companyName + '</div>' +
+        '<div style="font-size:9px;color:#9ca3af;">ที่อยู่บริษัท | โทร: 0XX-XXX-XXXX</div>' +
+      '</div>' +
+      '<div style="text-align:right;flex-shrink:0;">' +
+        '<div style="font-size:15px;font-weight:700;color:' + color + ';">' + t.th + '</div>' +
+        '<div style="font-size:9px;color:#9ca3af;">' + t.en + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">' +
+      '<div style="font-size:9px;color:#6b7280;"><u>ลูกค้า</u><br><b style="font-size:10px;">ชื่อลูกค้าตัวอย่าง</b><br>ที่อยู่ลูกค้า</div>' +
+      '<table style="font-size:9px;border-collapse:collapse;"><tr><td style="color:' + color + ';font-weight:600;padding-right:8px;">เลขที่</td><td style="font-weight:600;">' + t.id + '6902-0001</td></tr><tr><td style="color:' + color + ';font-weight:600;padding-right:8px;">วันที่</td><td style="font-weight:600;">18 ก.พ. 2569</td></tr></table>' +
+    '</div>' +
+    '<div style="background:' + soft + ';color:' + color + ';padding:4px 8px;font-size:10px;font-weight:600;border:1px solid #e5e7eb;border-bottom:none;">รายการสินค้า / บริการ</div>' +
+    '<table style="width:100%;font-size:9px;border-collapse:collapse;border:1px solid #e5e7eb;">' +
+      '<thead><tr style="background:#f9fafb;"><th style="padding:3px 4px;text-align:left;border-bottom:1px solid #e5e7eb;">#</th><th style="padding:3px 4px;text-align:left;border-bottom:1px solid #e5e7eb;">รายการ</th><th style="padding:3px 4px;text-align:right;border-bottom:1px solid #e5e7eb;">รวม</th></tr></thead>' +
+      '<tbody><tr><td style="padding:3px 4px;border-bottom:1px solid #f3f4f6;">1</td><td style="padding:3px 4px;border-bottom:1px solid #f3f4f6;">สินค้าตัวอย่าง</td><td style="padding:3px 4px;text-align:right;border-bottom:1px solid #f3f4f6;font-weight:600;">350.00</td></tr></tbody>' +
+    '</table>' +
+    '<div style="display:flex;justify-content:flex-end;margin-top:6px;">' +
+      '<table style="font-size:9px;border-collapse:collapse;width:120px;">' +
+        '<tr><td style="padding:2px 0;color:#6b7280;">รวมเงิน</td><td style="text-align:right;padding:2px 0;">350.00</td></tr>' +
+        '<tr style="background:' + soft + ';color:' + color + ';"><td style="padding:4px 4px;font-weight:600;">ยอดสุทธิ</td><td style="text-align:right;padding:4px 4px;font-weight:700;font-size:11px;">350.00</td></tr>' +
+      '</table>' +
+    '</div>';
+}
+
+function saveDocColorSettings() {
+  var settings = {};
+  var pickers = document.querySelectorAll(".doccolor-picker");
+  pickers.forEach(function(p) {
+    var dt = p.getAttribute("data-doctype");
+    if (dt) settings["docColor." + dt] = p.value;
+  });
+  _saveSettingsPartial(settings, "บันทึกสีเอกสารเรียบร้อย", function() {
+    applyDocColorsFromSettings();
+  });
+}
+
+function applyDocColorsFromSettings() {
+  var types = ["QUO","INV","BILL","TAX","RCPT","DO","PO","CN","PV","PR"];
+  types.forEach(function(dt) {
+    var saved = state.settings["docColor." + dt];
+    if (saved && DOC_CONFIG[dt]) {
+      DOC_CONFIG[dt].color = saved;
+    }
+  });
+}
+</script>

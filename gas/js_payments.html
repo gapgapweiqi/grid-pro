@@ -1,0 +1,412 @@
+<script>
+// ===== Payments Tracking Page =====
+var paymentsState = {
+  documents: [],
+  filteredDocs: [],
+  statusFilter: ""
+};
+
+function initPaymentsPage() {
+  var statusFilter = document.getElementById("paymentsStatusFilter");
+  var refreshBtn = document.getElementById("btnRefreshPayments");
+  
+  if (statusFilter) {
+    statusFilter.onchange = function() {
+      paymentsState.statusFilter = statusFilter.value;
+      filterAndRenderPayments();
+    };
+  }
+  
+  if (refreshBtn) {
+    refreshBtn.onclick = loadPayments;
+  }
+}
+
+function loadPayments() {
+  console.log("[loadPayments] START, sheetsId:", state.sheetsId ? "SET" : "NOT SET", "companyId:", state.companyId);
+  var tbody = document.getElementById("paymentsTbody");
+  if (!state.sheetsId) {
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="7" class="muted" style="text-align: center; padding: 40px;">กรุณาเชื่อมต่อ Google Sheets ก่อน (หน้าตั้งค่า)</td></tr>';
+    }
+    return;
+  }
+
+  // Use state.documents from refreshAll (already loaded)
+  var PAYABLE_TYPES = ["QUO", "INV", "BILL", "TAX", "DO", "PO", "CN", "PV", "PR"];
+  if (state.documents && state.documents.length > 0) {
+    console.log("[loadPayments] Using state.documents:", state.documents.length, "docs");
+    var docs = state.documents.filter(function(d) {
+      return PAYABLE_TYPES.indexOf(d.docType || d.type || "") !== -1;
+    }).map(function(d) {
+      if (!d.grandTotal && d.json && d.json.grandTotal) {
+        d.grandTotal = Number(d.json.grandTotal) || 0;
+      }
+      return d;
+    });
+    paymentsState.documents = docs;
+    filterAndRenderPayments();
+    updatePaymentsKPI();
+    return;
+  }
+
+  // Fallback: fetch from server
+  if (tbody) {
+    tbody.innerHTML = '<tr><td colspan="7" class="muted" style="text-align: center; padding: 40px;">กำลังโหลด...</td></tr>';
+  }
+  var companyId = state.companyId || null;
+
+  runServer("listPayableDocumentsApi", companyId)
+    .then(function(docs) {
+      console.log("[loadPayments] Server returned", docs ? docs.length : 0, "documents");
+      paymentsState.documents = docs || [];
+      filterAndRenderPayments();
+      updatePaymentsKPI();
+    })
+    .catch(function(error) {
+      console.error("[loadPayments] Server error:", error);
+      if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="7" class="muted" style="text-align: center; padding: 40px; color: #ef4444;">เกิดข้อผิดพลาด: ' + (error.message || error) + '</td></tr>';
+      }
+    });
+}
+
+function getPaymentStatusCategory(doc) {
+  var docType = doc.docType || doc.type || "";
+  if (docType === "RCPT") return "PAID";
+  var paymentStatus = doc.paymentStatus || "UNPAID";
+  if (paymentStatus === "PAID") {
+    return "PAID";
+  }
+  
+  // Check if overdue
+  var dueDate = doc.dueDate;
+  if (dueDate) {
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    var due = new Date(dueDate);
+    due.setHours(0, 0, 0, 0);
+    if (due < today) {
+      return "OVERDUE";
+    }
+  }
+  
+  return "UNPAID";
+}
+
+function calculateDaysRemaining(dueDate) {
+  if (!dueDate) return null;
+  
+  var today = new Date();
+  today.setHours(0, 0, 0, 0);
+  var due = new Date(dueDate);
+  due.setHours(0, 0, 0, 0);
+  
+  var diffTime = due - today;
+  var diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  return diffDays;
+}
+
+function filterAndRenderPayments() {
+  var docs = paymentsState.documents || [];
+  var statusFilter = paymentsState.statusFilter;
+  
+  var filtered = docs.filter(function(doc) {
+    if (!statusFilter) return true;
+    
+    var category = getPaymentStatusCategory(doc);
+    return category === statusFilter;
+  });
+  
+  paymentsState.filteredDocs = filtered;
+  renderPaymentsTable(filtered);
+}
+
+function updatePaymentsKPI() {
+  var docs = paymentsState.documents || [];
+  
+  var unpaidDocs = [];
+  var overdueDocs = [];
+  var paidDocs = [];
+  
+  docs.forEach(function(doc) {
+    var category = getPaymentStatusCategory(doc);
+    if (category === "PAID") {
+      paidDocs.push(doc);
+    } else if (category === "OVERDUE") {
+      overdueDocs.push(doc);
+    } else {
+      unpaidDocs.push(doc);
+    }
+  });
+  
+  var unpaidTotal = unpaidDocs.reduce(function(sum, d) { return sum + (d.grandTotal || 0); }, 0);
+  var overdueTotal = overdueDocs.reduce(function(sum, d) { return sum + (d.grandTotal || 0); }, 0);
+  var paidTotal = paidDocs.reduce(function(sum, d) { return sum + (d.grandTotal || 0); }, 0);
+  
+  var elUnpaidTotal = document.getElementById("paymentsUnpaidTotal");
+  var elUnpaidCount = document.getElementById("paymentsUnpaidCount");
+  var elOverdueTotal = document.getElementById("paymentsOverdueTotal");
+  var elOverdueCount = document.getElementById("paymentsOverdueCount");
+  var elPaidTotal = document.getElementById("paymentsPaidTotal");
+  var elPaidCount = document.getElementById("paymentsPaidCount");
+  
+  if (elUnpaidTotal) elUnpaidTotal.textContent = formatCompactMoney(unpaidTotal);
+  if (elUnpaidCount) elUnpaidCount.textContent = unpaidDocs.length + " รายการ";
+  if (elOverdueTotal) elOverdueTotal.textContent = formatCompactMoney(overdueTotal);
+  if (elOverdueCount) elOverdueCount.textContent = overdueDocs.length + " รายการ";
+  if (elPaidTotal) elPaidTotal.textContent = formatCompactMoney(paidTotal);
+  if (elPaidCount) elPaidCount.textContent = paidDocs.length + " รายการ";
+}
+
+function renderPaymentsTable(docs) {
+  var tbody = document.getElementById("paymentsTbody");
+  if (!tbody) return;
+  
+  if (!docs || !docs.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="muted" style="text-align: center; padding: 40px;">ไม่พบเอกสาร</td></tr>';
+    return;
+  }
+  
+  var html = "";
+  docs.forEach(function(doc) {
+    var docType = doc.docType || doc.type || "INV";
+    var docId = doc.docId || doc.entityId;
+    var config = DOC_CONFIG[docType] || DOC_CONFIG.INV;
+    var category = getPaymentStatusCategory(doc);
+    var daysRemaining = calculateDaysRemaining(doc.dueDate);
+    var json = doc.json || {};
+    var grandTotal = doc.grandTotal || json.grandTotal || 0;
+    var customerName = json.customerName || "-";
+    
+    var statusClass = "warning";
+    var statusText = "รอชำระ";
+    var daysText = "";
+    
+    if (category === "PAID") {
+      statusClass = "success";
+      statusText = "ชำระแล้ว";
+    } else if (category === "OVERDUE") {
+      statusClass = "danger";
+      statusText = "เกินกำหนด";
+      if (daysRemaining !== null) {
+        daysText = '<div style="font-size: 11px; color: #ef4444;">เกิน ' + Math.abs(daysRemaining) + ' วัน</div>';
+      }
+    } else {
+      if (daysRemaining !== null && daysRemaining >= 0) {
+        daysText = '<div style="font-size: 11px; color: #6b7280;">อีก ' + daysRemaining + ' วัน</div>';
+      }
+    }
+    
+    html += '<tr data-doc-id="' + docId + '">';
+    html += '<td><strong>' + (doc.docNo || "-") + '</strong></td>';
+    html += '<td><span class="badge" style="background: ' + config.color + '20; color: ' + config.color + '; padding: 4px 8px; border-radius: 4px; font-size: 11px; white-space: nowrap;">' + config.nameTH + '</span></td>';
+    html += '<td>' + customerName + '</td>';
+    html += '<td style="font-weight: 600;">' + formatMoney(grandTotal) + '</td>';
+    html += '<td>' + formatDateThai(doc.dueDate || doc.docDate) + daysText + '</td>';
+    html += '<td><span class="status-badge ' + statusClass + '">' + statusText + '</span></td>';
+    html += '<td>';
+    
+    if (category !== "PAID") {
+      html += '<button class="primary-button btn-mark-paid" data-id="' + docId + '" style="padding: 6px 12px; font-size: 12px;">ชำระแล้ว</button>';
+    } else {
+      html += '<button class="secondary-button btn-mark-unpaid" data-id="' + docId + '" style="padding: 6px 12px; font-size: 12px;">ยกเลิกชำระ</button>';
+    }
+    
+    html += '</td>';
+    html += '</tr>';
+  });
+  
+  tbody.innerHTML = html;
+  
+  // Attach event handlers
+  tbody.querySelectorAll(".btn-mark-paid").forEach(function(btn) {
+    btn.onclick = function() { markPaymentStatus(btn.dataset.id, "PAID"); };
+  });
+  tbody.querySelectorAll(".btn-mark-unpaid").forEach(function(btn) {
+    btn.onclick = function() { markPaymentStatus(btn.dataset.id, "UNPAID"); };
+  });
+}
+
+function markPaymentStatus(docId, status) {
+  if (status === "PAID") {
+    showPaymentConfirmDialog(docId);
+    return;
+  }
+  executePaymentStatusUpdate(docId, status);
+}
+
+function showPaymentConfirmDialog(docId) {
+  var doc = paymentsState.documents.find(function(d) {
+    return (d.docId || d.entityId) === docId;
+  });
+  var docNo = doc ? (doc.docNo || docId) : docId;
+  var docType = doc ? (doc.docType || doc.type || "") : "";
+  var config = DOC_CONFIG[docType] || {};
+  var docLabel = config.nameTH || docType;
+
+  var overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.style.display = "flex";
+  overlay.style.zIndex = "200";
+  overlay.innerHTML = '<div class="modal-content" style="max-width:420px;">' +
+    '<div class="modal-header"><h3>ยืนยันการชำระเงิน</h3>' +
+    '<button class="icon-button" id="closePayConfirmDialog"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>' +
+    '<div class="modal-body" style="padding:var(--space-5);">' +
+    '<p style="margin:0 0 12px;font-size:14px;">ต้องการบันทึกชำระเงินสำหรับ <strong>' + docLabel + ' ' + docNo + '</strong></p>' +
+    '<p style="margin:0 0 16px;font-size:13px;color:var(--color-muted);">คุณต้องการสร้างใบเสร็จรับเงิน (Receipt) อัตโนมัติหรือไม่?</p>' +
+    '<div style="display:flex;flex-direction:column;gap:8px;">' +
+    '<button class="primary-button" id="btnPayWithReceipt" style="width:100%;padding:10px;font-size:14px;">ชำระแล้ว + สร้างใบเสร็จรับเงิน</button>' +
+    '<button class="secondary-button" id="btnPayNoReceipt" style="width:100%;padding:10px;font-size:14px;">ชำระแล้ว (ไม่สร้างใบเสร็จ)</button>' +
+    '</div></div></div>';
+
+  document.body.appendChild(overlay);
+
+  function closeDialog() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+  overlay.querySelector("#closePayConfirmDialog").onclick = closeDialog;
+  overlay.onclick = function(e) { if (e.target === overlay) closeDialog(); };
+
+  overlay.querySelector("#btnPayWithReceipt").onclick = function() {
+    closeDialog();
+    createReceiptFromDocument(docId);
+  };
+  overlay.querySelector("#btnPayNoReceipt").onclick = function() {
+    closeDialog();
+    executePaymentStatusUpdate(docId, "PAID");
+  };
+}
+
+function executePaymentStatusUpdate(docId, status) {
+  var paymentDate = status === "PAID" ? new Date().toISOString().slice(0, 10) : "";
+
+  function updateLocalCache(docId, newStatus, paymentDate) {
+    [state.documents, paymentsState.documents].forEach(function(arr) {
+      if (!arr) return;
+      arr.forEach(function(doc) {
+        if ((doc.docId || doc.entityId) === docId) {
+          doc.paymentStatus = newStatus;
+          if (paymentDate) doc.paymentDate = paymentDate;
+        }
+      });
+    });
+  }
+
+  updateLocalCache(docId, status, paymentDate);
+  filterAndRenderPayments();
+  updatePaymentsKPI();
+  showToast(status === "PAID" ? "บันทึกชำระเงินแล้ว" : "ยกเลิกชำระเงินแล้ว", { type: "success" });
+
+  runServer("updatePaymentStatusApi", docId, status, paymentDate)
+    .catch(function(error) {
+      var revertStatus = status === "PAID" ? "UNPAID" : "PAID";
+      updateLocalCache(docId, revertStatus, "");
+      filterAndRenderPayments();
+      updatePaymentsKPI();
+      showToast("เกิดข้อผิดพลาด: " + (error.message || error), { type: "error" });
+    });
+}
+
+function createReceiptFromDocument(docId) {
+  var doc = paymentsState.documents.find(function(d) {
+    return (d.docId || d.entityId) === docId;
+  });
+  if (!doc) return;
+
+  var docType = doc.docType || doc.type || "";
+
+  // QUO / INV / TAX: navigate to document page and prefill as RCPT
+  if ((docType === "QUO" || docType === "INV" || docType === "TAX") && typeof prefillDocumentAsReceipt === "function") {
+    prefillDocumentAsReceipt(doc);
+    return;
+  }
+
+  // Other types: create receipt in background (original logic)
+  if (typeof doc.json === "string") {
+    try { doc.json = JSON.parse(doc.json); } catch(e) { doc.json = {}; }
+  }
+  var json = doc.json || {};
+  var today = new Date().toISOString().slice(0, 10);
+  var sourceDocId = doc.docId || doc.entityId;
+
+  // Optimistic UI: mark as PAID locally
+  [state.documents, paymentsState.documents].forEach(function(arr) {
+    if (!arr) return;
+    arr.forEach(function(d) {
+      if ((d.docId || d.entityId) === sourceDocId) {
+        d.paymentStatus = "PAID";
+        d.paymentDate = today;
+      }
+    });
+  });
+  filterAndRenderPayments();
+  updatePaymentsKPI();
+  showToast("กำลังสร้างใบเสร็จรับเงิน...", { type: "info" });
+
+  var rcptPayload = {
+    companyId: doc.companyId || state.companyId,
+    customerId: doc.customerId || "",
+    type: "RCPT",
+    docNo: "",
+    docDate: today,
+    dueDate: today,
+    status: "draft",
+    vatEnabled: toBoolean(doc.vatEnabled),
+    vatRate: Number(doc.vatRate) || 7,
+    whtEnabled: toBoolean(doc.whtEnabled),
+    whtRate: Number(doc.whtRate) || 3,
+    discountEnabled: toBoolean(doc.discountEnabled),
+    discountType: doc.discountType || "percent",
+    discountValue: Number(doc.discountValue) || 0,
+    signatureEnabled: false,
+    terms: "",
+    json: {
+      customerName: json.customerName || "",
+      customerTaxId: json.customerTaxId || "",
+      customerAddress: json.customerAddress || "",
+      customerPhone: json.customerPhone || "",
+      customerEmail: json.customerEmail || "",
+      note: "",
+      items: json.items || [],
+      itemMode: json.itemMode || "product",
+      subtotal: json.subtotal || doc.subtotal || 0,
+      grandTotal: json.grandTotal || doc.grandTotal || 0,
+      afterDiscount: json.afterDiscount || 0,
+      vatAmount: json.vatAmount || doc.vatAmount || 0,
+      whtAmount: json.whtAmount || doc.whtAmount || 0,
+      itemDiscount: json.itemDiscount || 0,
+      totalDiscount: json.totalDiscount || 0,
+      discountEnabled: toBoolean(doc.discountEnabled),
+      discountType: doc.discountType || "percent",
+      discountValue: Number(doc.discountValue) || 0,
+      vatEnabled: toBoolean(doc.vatEnabled),
+      vatRate: Number(doc.vatRate) || 7,
+      whtEnabled: toBoolean(doc.whtEnabled),
+      whtRate: Number(doc.whtRate) || 3,
+      refDocNo: doc.docNo || ""
+    }
+  };
+
+  Promise.all([
+    runServer("saveDocument", rcptPayload),
+    runServer("updatePaymentStatusApi", sourceDocId, "PAID", today)
+  ])
+    .then(function(results) {
+      var newDocId = results[0] && results[0].header ? results[0].header.docId : "";
+      showToast("สร้างใบเสร็จรับเงินเรียบร้อย", { type: "success" });
+      return refreshAll().then(function() {
+        if (newDocId && typeof navigateToDocHistoryAndSelect === "function") {
+          navigateToDocHistoryAndSelect(newDocId);
+        }
+      });
+    })
+    .catch(function(error) {
+      showToast("เกิดข้อผิดพลาด: " + (error.message || error), { type: "error" });
+    });
+}
+
+function toBoolean(val) {
+  if (val === true || val === "true" || val === 1 || val === "1") return true;
+  return false;
+}
+</script>

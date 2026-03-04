@@ -1,0 +1,76 @@
+export interface PricingPlan {
+  id: string;
+  name: string;
+  nameTh: string;
+  price: number; // THB flat price
+  description: string;
+  features: string[];
+  limits: {
+    companies: number; // 0 = unlimited
+    documentsPerMonth: number; // 0 = unlimited
+    products: number; // 0 = unlimited
+    customers: number; // 0 = unlimited
+    users: number; // 0 = unlimited
+    storageGB: number;
+  };
+}
+
+export const PRO_PLAN: PricingPlan = {
+  id: 'pro',
+  name: 'Pro',
+  nameTh: 'Pro',
+  price: 790,
+  description: 'ครบทุกฟีเจอร์ จ่ายครั้งเดียว ใช้งานได้ตลอดชีพ',
+  features: [
+    'ออกเอกสารไม่จำกัดทุกประเภท',
+    'เพิ่มบริษัทได้ไม่จำกัด',
+    'สินค้า/บริการ และลูกค้าไม่จำกัด',
+    'ระบบสต๊อกสินค้าครบวงจร',
+    'รูปแบบเอกสาร 4 แบบ',
+    'คำนวณ VAT / WHT อัตโนมัติ',
+    'ใบสั่งซื้อ (PO) + ใบลดหนี้',
+    'แดชบอร์ดรายงานแบบเรียลไทม์',
+    'ส่งออก CSV / พิมพ์ / PDF',
+    'รองรับทุกอุปกรณ์ ทุกแพลตฟอร์ม',
+    'เก็บข้อมูลบน Google drive ของคุณ',
+    'ผู้ใช้งาน 5 คน',
+    'ซัพพอร์ตตลอดการใช้งาน',
+  ],
+  limits: {
+    companies: 5,
+    documentsPerMonth: 0,
+    products: 0,
+    customers: 0,
+    users: 5,
+    storageGB: 10,
+  },
+};
+
+export const PRICING_PLANS: PricingPlan[] = [PRO_PLAN];
+
+export const FAQ_ITEMS = [
+  {
+    q: 'ทดลองใช้งานก่อนได้ไหม?',
+    a: 'คุณสามารถทดลองใช้งานฟีเจอร์ทั้งหมดได้ทันทีผ่านโหมด Sandbox โดยไม่ต้องสมัครสมาชิก เมื่อพร้อมใช้งานจริงค่อยชำระเงิน',
+  },
+  {
+    q: 'ราคา ฿790 ต้องจ่ายรายเดือนไหม?',
+    a: 'ไม่ต้องครับ เป็นราคาจ่ายครั้งเดียว (Lifetime) ไม่มีค่าบริการรายเดือนหรือรายปีแอบแฝง ซื้อครั้งเดียวใช้งานได้ตลอดไป',
+  },
+  {
+    q: 'รองรับการชำระเงินอะไรบ้าง?',
+    a: 'รองรับบัตรเครดิต/เดบิต (Visa, Mastercard, JCB) และ PromptPay ผ่านระบบที่ปลอดภัย',
+  },
+  {
+    q: 'ข้อมูลปลอดภัยไหม?',
+    a: 'ข้อมูลของคุณถูกเข้ารหัสและจัดเก็บบน Cloudflare Workers ที่มีมาตรฐานความปลอดภัยระดับสากล และมีการสำรองข้อมูลสม่ำเสมอ',
+  },
+  {
+    q: 'สามารถใช้งานบนมือถือได้ไหม?',
+    a: 'ได้ ระบบรองรับทุกอุปกรณ์ผ่าน Browser — มือถือ, แท็บเล็ต, คอมพิวเตอร์ ทั้ง Mac และ Windows',
+  },
+  {
+    q: 'มีการจำกัดจำนวนเอกสารไหม?',
+    a: 'ไม่มีการจำกัดจำนวนเอกสารที่คุณสามารถสร้างได้ สามารถออกเอกสารได้ไม่จำกัดจำนวนตลอดอายุการใช้งาน',
+  },
+];

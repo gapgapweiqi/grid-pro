@@ -1,0 +1,7 @@
+# Ensure service worker file is never cached by CDN/browser
+/service-worker.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
+# Same for the clear-sw escape page
+/clear-sw.html
+  Cache-Control: no-cache, no-store, must-revalidate

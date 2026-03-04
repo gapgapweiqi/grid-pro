@@ -1,0 +1,8 @@
+# Ignore standalone CSS and JS files (client-side only)
+gas/app.css
+gas/app.js
+
+# Ignore other files
+**/.DS_Store
+*.log
+**/node_modules/
