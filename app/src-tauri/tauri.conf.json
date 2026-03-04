@@ -50,7 +50,7 @@
       "endpoints": [
         "https://api.grid-doc.com/api/tauri-update/{{target}}/{{arch}}/{{current_version}}"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZERTJFQUIxODI5MjU5QUUKUldTdVdaS0NzZXJpYlF5azNPeHlFUHBFT1VKWHVwWGdNTDhQWHk3aUg4cG9ZRkZkZUVSSjZjOVAK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDgxRTNDRTJDQTdCODc1ODAKUldTQWRiaW5MTTdqZ2VGbXo4SE5Ua09Hd05MaUw2RUdaVHNZanJzS2pFenlPSklkUS9SdUt4UkcK"
     }
   }
 }
